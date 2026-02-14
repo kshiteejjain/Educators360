@@ -202,7 +202,10 @@ export default function AIInterview() {
           JSON.stringify({
             type: "conversation_initiation_client_data",
             conversation_config_override: configOverride,
-            dynamic_variables: { coach_name: coachName },
+            dynamic_variables: {
+              coach_name: coachName,
+              context_prompt: contextPrompt,
+            },
           })
         );
         await startMic(ws);

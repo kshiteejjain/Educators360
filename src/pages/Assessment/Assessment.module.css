@@ -1,0 +1,262 @@
+﻿.page {
+  padding: 32px 24px 48px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 28px;
+  margin: 0 0 8px;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 0;
+  color: #475569;
+  max-width: 640px;
+}
+
+.grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-size: 20px;
+  margin: 0;
+  color: #0f172a;
+}
+
+.cardDescription {
+  margin: 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.questionsSection {
+  margin-top: 12px;
+}
+
+.questionsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.questionsTitle {
+  margin: 0;
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.backButton {
+  border: 1px solid #cbd5f5;
+  background: #eef2ff;
+  color: #1d4ed8;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.backButton:hover {
+  background: #e0e7ff;
+}
+
+.questionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.questionCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.questionMeta {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.questionText {
+  font-size: 16px;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.questionWhy {
+  margin: 0 0 12px;
+  color: #475569;
+}
+
+.answerInput {
+  width: 100%;
+  border: 1px solid #cbd5f5;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.submitRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.reportSection {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reportBody {
+  padding: 24px;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #f8fafc 0%, #eef2ff 100%);
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  line-height: 1.7;
+  font-size: 15px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.scoreRow {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  margin-bottom: 12px;
+}
+
+.scoreHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.scoreLabel {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.scoreValue {
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.scoreBar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.scoreFill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8 0%, #6366f1 100%);
+  border-radius: 999px;
+}
+
+.scoreStars {
+  font-size: 16px;
+  color: #f59e0b;
+  margin-bottom: 6px;
+}
+
+.scoreNote {
+  margin: 0;
+  color: #475569;
+}
+
+.reportH2 {
+  font-size: 22px;
+  margin: 0 0 12px;
+  color: #0f172a;
+}
+
+.reportH3 {
+  font-size: 18px;
+  margin: 18px 0 8px;
+  color: #1e293b;
+}
+
+.reportH4 {
+  font-size: 16px;
+  margin: 14px 0 6px;
+  color: #334155;
+}
+
+.reportParagraph {
+  margin: 0 0 10px;
+  color: #0f172a;
+}
+
+.reportBullet {
+  margin: 0 0 8px;
+  color: #0f172a;
+  padding-left: 8px;
+}
+
+.reportSpacer {
+  height: 10px;
+}
+
+.error {
+  margin-top: 16px;
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+}
+
+.result {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.resultTitle {
+  margin: 0 0 12px;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.resultBody {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: "Courier New", Courier, monospace;
+  color: #0f172a;
+}

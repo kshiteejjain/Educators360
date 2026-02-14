@@ -23,6 +23,7 @@ type ProfileInput = {
   skills?: string[];
   education?: string;
   profileText?: string;
+  cvText?: string;
   targetKeywords?: string[];
 };
 
@@ -37,6 +38,8 @@ type AiAnalysis = {
     skills?: string[];
   };
   suggestedKeywords: string[];
+  analysisText?: string;
+  strategicKeywordCloud?: string[];
   targetRoleInsights?: {
     roleSummary?: string;
     growth?: string;
@@ -64,10 +67,37 @@ const buildAiPrompt = (payload: AiRequest) => {
     })),
   }));
 
+  const linkedinText = clip(
+    payload.profileData.profileText ||
+      [
+        payload.profileData.headline,
+        payload.profileData.summary,
+        payload.profileData.experience,
+        payload.profileData.education,
+        payload.profileData.skills?.join(", "),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    4000
+  );
+  const cvText = clip(payload.profileData.cvText || "", 4000);
+  const targetRole = clip(payload.targetRole || "", 120) || "Not provided";
+
   return [
-    "You are an expert LinkedIn profile coach.",
-    "Provide AI-based scoring, recommendations, and concrete modifications.",
-    "Also provide target role insights based on the current profile and the target role.",
+    "You are an expert Personal Branding Consultant and Executive Recruiter.",
+    `My desired target role is ${targetRole}.`,
+    "I am providing you with my LinkedIn Profile and my CV.",
+    "Please perform a 'Gap & Synthesis Analysis' to optimize my professional brand.",
+    "Cross-reference both documents to find the best data, but be critical of where information is lacking.",
+    "Structure your response exactly as follows:",
+    `1. Profile Score: Current score out of 100 based on alignment with the ${targetRole}.`,
+    "2. Section-by-Section Analysis: For each section (Headline, About, Experience, Skills, Activity):",
+    "? What's working well: The strongest points found in my LinkedIn profile",
+    "? What's missing or weak: Identify specific gaps, lack of metrics, generic language, or missed opportunities for the target role in this specific section.",
+    "?? Conflict Check: Note any discrepancies between the CV and LinkedIn (e.g., different titles or dates).",
+    "?? Replace / Action Plan: Provide the final, optimized copy I should use. Synthesize the best data from the CV with the best narrative from LinkedIn.",
+    "?? Estimated Score Gain: Predicted impact of these changes.",
+    `3. Strategic Keyword Cloud: List the top 15 keywords for ${targetRole} that must be added to my profile.`,
     "Use the provided data only; do not invent roles, dates, or companies.",
     "Return STRICT JSON only, no extra text, using this schema:",
     `{
@@ -81,6 +111,8 @@ const buildAiPrompt = (payload: AiRequest) => {
     "skills": ["skill1","skill2","skill3","skill4","skill5","skill6","skill7","skill8","skill9","skill10","skill11","skill12"]
   },
   "suggestedKeywords": ["keyword1","keyword2","keyword3","keyword4","keyword5","keyword6","keyword7","keyword8"],
+  "analysisText": "Full response structured exactly as requested above.",
+  "strategicKeywordCloud": ["keyword1","keyword2","keyword3","keyword4","keyword5","keyword6","keyword7","keyword8","keyword9","keyword10","keyword11","keyword12","keyword13","keyword14","keyword15"],
   "targetRoleInsights": {
     "roleSummary": "2-3 sentences about the target role",
     "growth": "1-2 sentences about role growth and demand",
@@ -88,8 +120,12 @@ const buildAiPrompt = (payload: AiRequest) => {
     "jobInsights": ["insight1","insight2","insight3","insight4"]
   }
 }`,
-    `Target role: ${clip(payload.targetRole || "", 120) || "Not provided"}`,
-    "Profile data:",
+    `Target role: ${targetRole}`,
+    "SOURCE 1: LINKEDIN PROFILE DATA",
+    linkedinText || "Not provided",
+    "SOURCE 2: CV / RESUME DATA",
+    cvText || "Not provided",
+    "Analysis metadata:",
     JSON.stringify(
       {
         headline: clip(payload.profileData.headline || "", 400),

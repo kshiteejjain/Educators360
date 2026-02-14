@@ -12,7 +12,7 @@ const menuItems = [
   { name: "Resume Builder", path: "/ResumeBuilder", icon: "\u{1F4C4}" },
   { name: "LinkedIn Profile Analysis", path: "/LinkedinAnalysis", icon: "\u{1F50D}" },
   { name: "Schedule 1:1 Meet", path: "/Mentorship", icon: "\u{1F4C5}" },
-  { name: "Assessment", path: "/", icon: "\u{1F4DD}" },
+  { name: "Assessment", path: "/Assessment", icon: "\u{1F4DD}" },
   { name: "AI Interview", path: "/AIInterview", icon: "\u{1F916}" },
   { name: "Ask Anu - Your AI Coach", path: "/AskAnu", icon: "/shiksha.png" },
   { name: "Discussions", path: "/Discussions", icon: "\u{1F4AC}" },

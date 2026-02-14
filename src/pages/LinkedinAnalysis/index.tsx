@@ -42,6 +42,8 @@ type AnalysisResult = {
       skills?: string[];
     };
     suggestedKeywords: string[];
+    analysisText?: string;
+    strategicKeywordCloud?: string[];
     targetRoleInsights?: {
       roleSummary?: string;
       growth?: string;
@@ -111,6 +113,8 @@ export default function LinkedinAnalysis() {
             skills?: string[];
           };
           suggestedKeywords?: string[];
+          analysisText?: string;
+          strategicKeywordCloud?: string[];
           targetRoleInsights?: {
             roleSummary?: string;
             growth?: string;
@@ -131,6 +135,8 @@ export default function LinkedinAnalysis() {
             recommendations: aiData.recommendations ?? [],
             modifications: aiData.modifications ?? {},
             suggestedKeywords: aiData.suggestedKeywords ?? [],
+            analysisText: aiData.analysisText ?? "",
+            strategicKeywordCloud: aiData.strategicKeywordCloud ?? [],
             targetRoleInsights: aiData.targetRoleInsights ?? {
               roleSummary: "",
               growth: "",
@@ -395,6 +401,28 @@ export default function LinkedinAnalysis() {
                         </span>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {!!analysisResult.aiAnalysis.strategicKeywordCloud?.length && (
+                  <div className={styles.summaryCard}>
+                    <span className={styles.summaryLabel}>Strategic Keyword Cloud</span>
+                    <div className={styles.cardTags}>
+                      {analysisResult.aiAnalysis.strategicKeywordCloud.map((item, idx) => (
+                        <span key={idx} className={styles.cardTag}>
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analysisResult.aiAnalysis.analysisText && (
+                  <div className={styles.summaryCard}>
+                    <span className={styles.summaryLabel}>Gap & Synthesis Analysis</span>
+                    <p className={styles.cardText} style={{ whiteSpace: "pre-wrap" }}>
+                      {analysisResult.aiAnalysis.analysisText}
+                    </p>
                   </div>
                 )}
 
