@@ -190,7 +190,7 @@ export default function LinkedinAnalysis() {
                 value={linkedinUrl}
                 onChange={(e) => setLinkedinUrl(e.target.value)}
                 placeholder="https://www.linkedin.com/in/yourprofile/"
-                className={styles.input}
+                className="form-control"
                 disabled={isLoading}
               />
               <p className={styles.hint}>Example: https://www.linkedin.com/in/kshiteejjain/</p>
@@ -205,7 +205,7 @@ export default function LinkedinAnalysis() {
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
                 placeholder="e.g., Maths Teacher"
-                className={styles.input}
+                className="form-control"
                 disabled={isLoading}
               />
               <p className={styles.hint}>Example: Role you are looking for</p>

@@ -16,6 +16,7 @@
   font-size: 2rem;
   font-weight: 800;
   margin-bottom: 12px;
+  color: var(--color-text)
 }
 
 .header p {
