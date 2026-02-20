@@ -1,5 +1,4 @@
-import { useState } from "react";
-import Link from "next/link";
+﻿import { useState } from "react";
 import Layout from "@/components/Layout/Layout";
 import styles from "./LinkedinAnalysis.module.css";
 import { useLoader } from "@/components/Loader/LoaderProvider";
@@ -156,32 +155,20 @@ export default function LinkedinAnalysis() {
     await withLoader(analyzeProfile, "Analyzing your LinkedIn profile...");
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "#10b981"; // Green
-    if (score >= 60) return "#f59e0b"; // Amber
-    return "#ef4444"; // Red
-  };
-
-  const getScoreMessage = (score: number) => {
-    if (score >= 80) return "Excellent Profile!";
-    if (score >= 60) return "Good Profile";
-    return "Needs Improvement";
-  };
-
   return (
     <Layout>
       <div className={styles.container}>
         {/* Header */}
         <div className={styles.header}>
-          <h1>🔗 LinkedIn Profile Analyzer</h1>
+          <h1>LinkedIn Profile Analyzer</h1>
           <p>Get AI-powered insights to optimize your LinkedIn profile and boost recruiter visibility</p>
         </div>
 
         {/* Input Section */}
         <div className={styles.inputSection}>
           <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.formGroup}>
-              <label htmlFor="linkedinUrl" className={styles.label}>
+            <div className="form-group">
+              <label htmlFor="linkedinUrl">
                 Enter Your LinkedIn Profile URL
               </label>
               <input
@@ -195,8 +182,8 @@ export default function LinkedinAnalysis() {
               />
               <p className={styles.hint}>Example: https://www.linkedin.com/in/kshiteejjain/</p>
             </div>
-            <div className={styles.formGroup}>
-              <label htmlFor="targetRole" className={styles.label}>
+            <div className="form-group">
+              <label htmlFor="targetRole">
                 Target Role
               </label>
               <input
@@ -222,294 +209,13 @@ export default function LinkedinAnalysis() {
         {/* Analysis Results */}
         {analysisResult && (
           <div className={styles.resultsSection}>
-            {/* Score Card */}
-            <div className={styles.scoreCard}>
-              <div className={styles.scoreDisplay}>
-                <div
-                  className={styles.scoreCircle}
-                  style={{ borderColor: getScoreColor(analysisResult.profileScore) }}
-                >
-                  <span
-                    className={styles.scoreValue}
-                    style={{ color: getScoreColor(analysisResult.profileScore) }}
-                  >
-                    {analysisResult.profileScore}
-                  </span>
-                  <span className={styles.scoreMax}>/100</span>
-                </div>
-                <div className={styles.scoreInfo}>
-                  <h2 style={{ color: getScoreColor(analysisResult.profileScore) }}>
-                    {analysisResult.profileScore > 50 && " ❤️"} {getScoreMessage(analysisResult.profileScore)}
-                  </h2>
-                  <p className={styles.scoreDescription}>
-                    Your profile demonstrates strong technical expertise, but focused improvements can significantly enhance your impact and searchability.
-                  </p>
-                  <Link href="/ResumeBuilder" className={styles.improvementBtn}>
-                    View Recommendations →
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* Summary Cards */}
-            <div className={styles.summaryGrid}>
-              <div className={styles.summaryCard}>
-                <span className={styles.summaryLabel}>Profile Score</span>
-                <span className={styles.summaryValue}>
-                  {analysisResult.profileScore}
-                </span>
-              </div>
-              {analysisResult.sections.map((section, idx) => (
-                <div key={`${section.title}-${idx}`} className={styles.summaryCard}>
-                  <span className={styles.summaryLabel}>{section.title}</span>
-                  <span className={styles.summaryValue}>{section.items.length}</span>
-                  <span className={styles.summarySubtext}>insights</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Analysis Sections */}
-            <div className={styles.analysisGrid}>
-              {analysisResult.sections.map((section, sectionIdx) => (
-                <div
-                  key={sectionIdx}
-                  className={`${styles.section} ${styles[`section-${section.color}`]}`}
-                >
-                  <div className={styles.sectionHeader}>
-                    <span className={styles.sectionIcon}>{section.icon}</span>
-                    <h3>{section.title}</h3>
-                  </div>
-
-                  <div className={styles.sectionContent}>
-                    {section.items.map((item, itemIdx) => (
-                      <div key={itemIdx} className={styles.item}>
-                        {item.type === "positive" && (
-                          <>
-                            <div className={styles.itemHeader}>
-                              <span className={styles.checkmark}>✅</span>
-                              <span className={styles.itemInlineText}>{item.text}</span>
-                              <span className={styles.scoreTag}>+{item.scoreImpact}</span>
-                            </div>
-                          </>
-                        )}
-                        {item.type === "negative" && (
-                          <>
-                            <div className={styles.itemHeader}>
-                              <span className={styles.cross}>⛔</span>
-                              <span className={styles.itemInlineText}>{item.text}</span>
-                              <span className={styles.scoreTag}>+{item.scoreImpact}</span>
-                            </div>
-                            {item.suggestion && (
-                              <div className={styles.suggestion}>
-                                <strong>Replace with a concise, targeted</strong>
-                                <p>{item.suggestion}</p>
-                              </div>
-                            )}
-                          </>
-                        )}
-                        {item.type === "suggestion" && (
-                          <>
-                            <div className={styles.itemHeader}>
-                              <span className={styles.lightBulb}>💡</span>
-                              <span className={styles.itemInlineText}>{item.text}</span>
-                              <span className={styles.scoreTag}>+{item.scoreImpact}</span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* AI Recommendations (card layout) */}
-            {analysisResult.aiAnalysis && (
-              <div className={styles.aiCardGrid}>
-                <div className={styles.summaryCard}>
-                  <span className={styles.summaryLabel}>AI Score</span>
-                  <span className={styles.summaryValue}>
-                    {analysisResult.aiAnalysis.aiScore}
-                  </span>
-                  <p className={styles.cardText}>
-                    {analysisResult.aiAnalysis.scoreRationale}
-                  </p>
-                </div>
-
-                {!!analysisResult.aiAnalysis.recommendations?.length && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>Top Recommendations</span>
-                    <ul className={styles.cardList}>
-                      {analysisResult.aiAnalysis.recommendations.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {analysisResult.aiAnalysis.modifications.headline && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>Headline Rewrite</span>
-                    <p className={styles.cardText}>
-                      {analysisResult.aiAnalysis.modifications.headline}
-                    </p>
-                  </div>
-                )}
-
-                {analysisResult.aiAnalysis.modifications.about && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>About Rewrite</span>
-                    <p className={styles.cardText}>
-                      {analysisResult.aiAnalysis.modifications.about}
-                    </p>
-                  </div>
-                )}
-
-                {!!analysisResult.aiAnalysis.modifications.experienceBullets?.length && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>Experience Bullets</span>
-                    <ul className={styles.cardList}>
-                      {analysisResult.aiAnalysis.modifications.experienceBullets.map(
-                        (item, idx) => (
-                          <li key={idx}>{item}</li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                )}
-
-                {!!analysisResult.aiAnalysis.modifications.skills?.length && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>Suggested Skills</span>
-                    <div className={styles.cardTags}>
-                      {analysisResult.aiAnalysis.modifications.skills.map((item, idx) => (
-                        <span key={idx} className={styles.cardTag}>
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!!analysisResult.aiAnalysis.suggestedKeywords?.length && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>Suggested Keywords</span>
-                    <div className={styles.cardTags}>
-                      {analysisResult.aiAnalysis.suggestedKeywords.map((item, idx) => (
-                        <span key={idx} className={styles.cardTag}>
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!!analysisResult.aiAnalysis.strategicKeywordCloud?.length && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>Strategic Keyword Cloud</span>
-                    <div className={styles.cardTags}>
-                      {analysisResult.aiAnalysis.strategicKeywordCloud.map((item, idx) => (
-                        <span key={idx} className={styles.cardTag}>
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {analysisResult.aiAnalysis.analysisText && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>Gap & Synthesis Analysis</span>
-                    <p className={styles.cardText} style={{ whiteSpace: "pre-wrap" }}>
-                      {analysisResult.aiAnalysis.analysisText}
-                    </p>
-                  </div>
-                )}
-
-                {(analysisResult.aiAnalysis.targetRoleInsights?.roleSummary ||
-                  analysisResult.aiAnalysis.targetRoleInsights?.growth ||
-                  analysisResult.aiAnalysis.targetRoleInsights?.marketValue ||
-                  analysisResult.aiAnalysis.targetRoleInsights?.jobInsights?.length) && (
-                  <div className={styles.summaryCard}>
-                    <span className={styles.summaryLabel}>Target Role Insights</span>
-                    {analysisResult.aiAnalysis.targetRoleInsights?.roleSummary && (
-                      <p className={styles.cardText}>
-                        {analysisResult.aiAnalysis.targetRoleInsights.roleSummary}
-                      </p>
-                    )}
-                    {analysisResult.aiAnalysis.targetRoleInsights?.growth && (
-                      <p className={styles.cardText}>
-                        <strong>Growth:</strong>{" "}
-                        {analysisResult.aiAnalysis.targetRoleInsights.growth}
-                      </p>
-                    )}
-                    {analysisResult.aiAnalysis.targetRoleInsights?.marketValue && (
-                      <p className={styles.cardText}>
-                        <strong>Market Value:</strong>{" "}
-                        {analysisResult.aiAnalysis.targetRoleInsights.marketValue}
-                      </p>
-                    )}
-                    {!!analysisResult.aiAnalysis.targetRoleInsights?.jobInsights?.length && (
-                      <ul className={styles.cardList}>
-                        {analysisResult.aiAnalysis.targetRoleInsights.jobInsights.map(
-                          (item, idx) => (
-                            <li key={idx}>{item}</li>
-                          )
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Action Section */}
-            <div className={styles.actionSection}>
-              <h2>Next Steps</h2>
-              <div className={styles.actionGrid}>
-                <div className={styles.actionCard}>
-                  <span className={styles.actionIcon}>📄</span>
-                  <h4>Update Your Profile</h4>
-                  <p>Implement the suggestions above to boost your profile score</p>
-                  <a href={analysisResult.profileUrl} target="_blank" rel="noopener noreferrer" className={styles.actionLink}>
-                    Edit on LinkedIn →
-                  </a>
-                </div>
-                <div className={styles.actionCard}>
-                  <span className={styles.actionIcon}>💼</span>
-                  <h4>Build Your Resume</h4>
-                  <p>Create a matching resume that aligns with your LinkedIn profile</p>
-                  <Link href="/ResumeBuilder" className={styles.actionLink}>
-                    Create Resume →
-                  </Link>
-                </div>
-                <div className={styles.actionCard}>
-                  <span className={styles.actionIcon}>🤖</span>
-                  <h4>Interview Practice</h4>
-                  <p>Prepare for interviews with AI-powered interview questions</p>
-                  <Link href="/InterviewQuestions" className={styles.actionLink}>
-                    Start Practice →
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* Analyze Another */}
-            <div className={styles.analyzeAnother}>
-              <button
-                onClick={() => {
-                  setAnalysisResult(null);
-                  setLinkedinUrl("");
-                  setTargetRole("");
-                }}
-                className={styles.analyzeAnotherBtn}
-              >
-                ← Analyze Another Profile
-              </button>
-            </div>
+            <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              {JSON.stringify(analysisResult, null, 2)}
+            </pre>
           </div>
         )}
       </div>
     </Layout>
   );
 }
+

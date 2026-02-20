@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Layout from "@/components/Layout/Layout";
@@ -20,7 +20,7 @@ const MENTORS = [
     bio: "Founder upEducators - Google For Education Partner Company - offering Online Professional Development Courses to Educators. We have trained 10,000+ Educators teachers from nearly about 3,000+ Educational Institutes in India.",
     expertise: ["Entrepreneurship", "Portfolio Management", "Training", "Wealth Management"],
     experience: "10+ Years",
-    avatar: "👤",
+    avatar: "ðŸ‘¤",
     photo: "/ankush-bhandari.jpg",
     color: "gradient-blue",
     rating: 4.9,
@@ -141,7 +141,7 @@ export default function Mentorship() {
       <div className={styles.container}>
         {/* Header */}
         <div className={styles.header}>
-          <h1>📅 Schedule 1:1 Mentorship Call</h1>
+          <h1>ðŸ“… Schedule 1:1 Mentorship Call</h1>
           <p>Get personalized guidance from industry experts</p>
         </div>
 
@@ -187,7 +187,7 @@ export default function Mentorship() {
                       )}
                     </div>
                     <div className={styles.rating}>
-                      <span className={styles.stars}>⭐ {mentor.rating}</span>
+                      <span className={styles.stars}>â­ {mentor.rating}</span>
                       <span className={styles.reviews}>({mentor.reviews} reviews)</span>
                     </div>
                   </div>
@@ -207,11 +207,11 @@ export default function Mentorship() {
                   </div>
 
                   <div className={styles.meta}>
-                    <span>🕐 {mentor.experience}</span>
+                    <span>ðŸ• {mentor.experience}</span>
                   </div>
 
                   <button className={styles.selectBtn}>
-                    {selectedMentor === mentor.id ? "✓ Selected" : "Schedule Call"}
+                    {selectedMentor === mentor.id ? "âœ“ Selected" : "Schedule Call"}
                   </button>
                 </div>
               ))}
@@ -247,14 +247,14 @@ export default function Mentorship() {
 
               <div className={styles.actionButtons}>
                 <button onClick={() => setCurrentStep("mentor")} className={styles.backBtn}>
-                  ← Back
+                  â† Back
                 </button>
                 <button
                   onClick={() => setCurrentStep("time")}
                   disabled={!selectedDate}
                   className={styles.nextBtn}
                 >
-                  Next →
+                  Next â†’
                 </button>
               </div>
             </div>
@@ -286,14 +286,14 @@ export default function Mentorship() {
 
               <div className={styles.actionButtons}>
                 <button onClick={() => setCurrentStep("date")} className={styles.backBtn}>
-                  ← Back
+                  â† Back
                 </button>
                 <button
                   onClick={() => setCurrentStep("details")}
                   disabled={!selectedTime}
                   className={styles.nextBtn}
                 >
-                  Next →
+                  Next â†’
                 </button>
               </div>
             </div>
@@ -323,7 +323,7 @@ export default function Mentorship() {
               </div>
 
               <form className={styles.form}>
-                <div className={styles.formGroup}>
+                <div className="form-group">
                   <label htmlFor="name">Full Name *</label>
                   <input
                     id="name"
@@ -331,12 +331,12 @@ export default function Mentorship() {
                     value={bookingDetails.name}
                     onChange={(e) => handleDetailsChange("name", e.target.value)}
                     placeholder="Enter your full name"
-                    className={styles.input}
+                    className="form-control"
                   />
                 </div>
 
                 <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
+                  <div className="form-group">
                     <label htmlFor="email">Email *</label>
                     <input
                       id="email"
@@ -344,10 +344,10 @@ export default function Mentorship() {
                       value={bookingDetails.email}
                       onChange={(e) => handleDetailsChange("email", e.target.value)}
                       placeholder="your@email.com"
-                      className={styles.input}
+                      className="form-control"
                     />
                   </div>
-                  <div className={styles.formGroup}>
+                  <div className="form-group">
                     <label htmlFor="phone">Phone Number *</label>
                     <input
                       id="phone"
@@ -355,12 +355,12 @@ export default function Mentorship() {
                       value={bookingDetails.phone}
                       onChange={(e) => handleDetailsChange("phone", e.target.value)}
                       placeholder="+1 (555) 123-4567"
-                      className={styles.input}
+                      className="form-control"
                     />
                   </div>
                 </div>
 
-                <div className={styles.formGroup}>
+                <div className="form-group">
                   <label htmlFor="topic">Discussion Topic *</label>
                   <input
                     id="topic"
@@ -368,18 +368,18 @@ export default function Mentorship() {
                     value={bookingDetails.topic}
                     onChange={(e) => handleDetailsChange("topic", e.target.value)}
                     placeholder="What would you like to discuss?"
-                    className={styles.input}
+                    className="form-control"
                   />
                 </div>
 
-                <div className={styles.formGroup}>
+                <div className="form-group">
                   <label htmlFor="message">Additional Message</label>
                   <textarea
                     id="message"
                     value={bookingDetails.message}
                     onChange={(e) => handleDetailsChange("message", e.target.value)}
                     placeholder="Any additional information..."
-                    className={styles.textarea}
+                    className="form-control"
                     rows={4}
                   />
                 </div>
@@ -387,7 +387,7 @@ export default function Mentorship() {
 
               <div className={styles.actionButtons}>
                 <button onClick={() => setCurrentStep("time")} className={styles.backBtn}>
-                  ← Back
+                  â† Back
                 </button>
                 <button onClick={handleBooking} className={styles.confirmBtn}>
                   Schedule Call
@@ -400,7 +400,7 @@ export default function Mentorship() {
         {currentStep === "confirmation" && (
           <div className={styles.stepContent}>
             <div className={styles.confirmationSection}>
-              <div className={styles.successIcon}>🎉</div>
+              <div className={styles.successIcon}>ðŸŽ‰</div>
               <h2>Booking Confirmed!</h2>
               <p className={styles.successMessage}>
                 Your mentorship call has been scheduled successfully.
@@ -471,3 +471,4 @@ export default function Mentorship() {
     </Layout>
   );
 }
+

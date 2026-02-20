@@ -9,6 +9,7 @@
   --color-green: #10b981;
   --color-text: #474747;
   --color-gray: #c2cacc;
+  --color-error: #d64545
 }
 
 html,
@@ -131,6 +132,7 @@ p {
   margin-bottom: 1.2rem;
   display: flex;
   flex-direction: column;
+  gap: 6px;
   font-family: 'Ubuntu' !important;
 }
 
@@ -144,9 +146,9 @@ textarea {
 
 /* Label styling */
 .form-group label {
-  color: var(--color-black);
-  margin-bottom: 8px;
-  font-size: 14px;
+  color: var(--color-text);
+  margin: 15px 0 5px 0;
+  font-size: 13px;
 }
 
 /* Input field */
@@ -156,11 +158,11 @@ input:disabled {
 }
 
 .form-control {
-  padding: 12px 14px;
+  padding: 10px;
   border: 1px solid var(--color-gray);
   color: var(--color-text);
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 14px;
   transition: all 0.3s ease;
   outline: none;
   background: var(--color-white);
@@ -169,6 +171,11 @@ input:disabled {
 .form-control:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 6px var(--color-rgba-143-5-0-03);
+}
+
+textarea.form-control {
+  min-height: 80px;
+  resize: vertical;
 }
 
 /* Optional: yellow submit button */

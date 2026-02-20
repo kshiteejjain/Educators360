@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@/components/Layout/Layout";
 import styles from "./AIInterview.module.css";
 
@@ -311,14 +311,14 @@ export default function AIInterview() {
             </div>
 
             <form className={styles.card} onSubmit={handleSubmit}>
-              <div className={styles.formGroup}>
+              <div>
                 <div className="form-group">
-                  <label className={styles.label} htmlFor="coachName">
+                  <label htmlFor="coachName">
                     Coach Name
                   </label>
                   <input
                     id="coachName"
-                    className={`form-control ${styles.input}`}
+                    className="form-control"
                     value={coachName}
                     onChange={(e) => setCoachName(e.target.value)}
                     placeholder="Career"
@@ -326,13 +326,13 @@ export default function AIInterview() {
                 </div>
 
                 <div className="form-group">
-                  <label className={styles.label} htmlFor="contextPrompt">
+                  <label htmlFor="contextPrompt">
                     Add Detailed Prompt for Interview Context (Example - Interviewer profile,
                     job description)
                   </label>
                   <textarea
                     id="contextPrompt"
-                    className={`form-control ${styles.textarea}`}
+                    className="form-control"
                     value={contextPrompt}
                     onChange={(e) => setContextPrompt(e.target.value)}
                     placeholder="I am Math teacher"
@@ -406,7 +406,7 @@ export default function AIInterview() {
                       aria-pressed={isMuted}
                       title={isMuted ? "Unmute" : "Mute"}
                     >
-                      🎤
+                      ðŸŽ¤
                     </button>
                   </div>
                   <div className={styles.audioStatus}>
@@ -442,3 +442,4 @@ export default function AIInterview() {
     </Layout>
   );
 }
+

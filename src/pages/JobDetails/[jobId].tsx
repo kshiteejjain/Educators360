@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -145,6 +153,177 @@ const renderValue = (value: unknown, key?: string) => {
     return String(value);
   }
   return JSON.stringify(value, null, 2);
+};
+
+const renderTextWithBreaks = (value: string) => {
+  if (!value.includes("\n")) return value;
+  const lines = value.split(/\n/);
+  return lines.map((line, index) => (
+    <Fragment key={`line-${index}`}>
+      {line}
+      {index < lines.length - 1 ? <br /> : null}
+    </Fragment>
+  ));
+};
+
+const renderInline = (text: string) => {
+  if (!text.includes("*")) return text;
+  const tokens = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
+  return tokens.map((token, index) => {
+    if (token.startsWith("**") && token.endsWith("**")) {
+      return <strong key={`bold-${index}`}>{token.slice(2, -2)}</strong>;
+    }
+    if (token.startsWith("*") && token.endsWith("*")) {
+      return <em key={`italic-${index}`}>{token.slice(1, -1)}</em>;
+    }
+    return <Fragment key={`text-${index}`}>{token}</Fragment>;
+  });
+};
+
+const renderRichText = (value: string) => {
+  const lines = value.split(/\r?\n/);
+  const blocks: ReactNode[] = [];
+  let index = 0;
+  let blockKey = 0;
+
+  const isListItem = (line: string) => /^(\*|-|•)\s+/.test(line.trim());
+  const isOrderedItem = (line: string) => /^\d+\.\s+/.test(line.trim());
+  const isHeading = (line: string) => /^#{1,4}\s+/.test(line.trim());
+  const isHr = (line: string) => /^-{3,}$/.test(line.trim());
+
+  const collectListItems = (ordered: boolean) => {
+    const items: string[][] = [];
+    while (index < lines.length) {
+      const current = lines[index].trim();
+      if (ordered ? isOrderedItem(current) : isListItem(current)) {
+        const cleaned = ordered
+          ? current.replace(/^\d+\.\s+/, "")
+          : current.replace(/^(\*|-|•)\s+/, "");
+        const itemLines: string[] = [cleaned];
+        index += 1;
+        while (index < lines.length) {
+          const next = lines[index];
+          const nextTrimmed = next.trim();
+          if (
+            (ordered ? isOrderedItem(nextTrimmed) : isListItem(nextTrimmed)) ||
+            isHeading(nextTrimmed) ||
+            isHr(nextTrimmed)
+          ) {
+            break;
+          }
+          if (!nextTrimmed) {
+            itemLines.push("");
+            index += 1;
+            continue;
+          }
+          itemLines.push(nextTrimmed);
+          index += 1;
+        }
+        items.push(itemLines);
+      } else {
+        break;
+      }
+    }
+    return items;
+  };
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      blocks.push(<br key={`br-${blockKey++}`} />);
+      index += 1;
+      continue;
+    }
+
+    if (isHr(trimmed)) {
+      blocks.push(<hr key={`hr-${blockKey++}`} />);
+      index += 1;
+      continue;
+    }
+
+    if (isHeading(trimmed)) {
+      const match = trimmed.match(/^(#{1,4})\s+(.+)$/);
+      if (match) {
+        const level = match[1].length;
+        const text = match[2];
+        if (level === 1) {
+          blocks.push(<h1 key={`h-${blockKey++}`}>{renderInline(text)}</h1>);
+        } else if (level === 2) {
+          blocks.push(<h2 key={`h-${blockKey++}`}>{renderInline(text)}</h2>);
+        } else if (level === 3) {
+          blocks.push(<h3 key={`h-${blockKey++}`}>{renderInline(text)}</h3>);
+        } else {
+          blocks.push(<h4 key={`h-${blockKey++}`}>{renderInline(text)}</h4>);
+        }
+      }
+      index += 1;
+      continue;
+    }
+
+    if (isListItem(trimmed) || isOrderedItem(trimmed)) {
+      const ordered = isOrderedItem(trimmed);
+      const items = collectListItems(ordered);
+      const listItems = items.map((itemLines, itemIndex) => {
+        const paragraphs: string[] = [];
+        let buffer: string[] = [];
+        itemLines.forEach((line) => {
+          if (!line) {
+            if (buffer.length) {
+              paragraphs.push(buffer.join(" "));
+              buffer = [];
+            }
+          } else {
+            buffer.push(line);
+          }
+        });
+        if (buffer.length) paragraphs.push(buffer.join(" "));
+        return (
+          <li key={`li-${blockKey}-${itemIndex}`}>
+            {paragraphs.map((paragraph, paragraphIndex) => (
+              <p key={`li-p-${blockKey}-${itemIndex}-${paragraphIndex}`}>
+                {renderInline(paragraph)}
+              </p>
+            ))}
+          </li>
+        );
+      });
+      blocks.push(
+        ordered ? (
+        <ol key={`list-${blockKey++}`}>{listItems}</ol>
+        ) : (
+          <ul key={`list-${blockKey++}`}>{listItems}</ul>
+        )
+      );
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (index < lines.length) {
+      const current = lines[index];
+      const currentTrimmed = current.trim();
+      if (
+        !currentTrimmed ||
+        isHeading(currentTrimmed) ||
+        isListItem(currentTrimmed) ||
+        isOrderedItem(currentTrimmed) ||
+        isHr(currentTrimmed)
+      ) {
+        break;
+      }
+      paragraphLines.push(currentTrimmed);
+      index += 1;
+    }
+    const paragraph = paragraphLines.join(" ");
+    blocks.push(
+      <p key={`p-${blockKey++}`}>
+        {renderInline(paragraph)}
+      </p>
+    );
+  }
+
+  return blocks;
 };
 
 export default function JobDetailsPage() {
@@ -298,7 +477,7 @@ export default function JobDetailsPage() {
               <div className={styles.actions}>
                 <button
                   type="button"
-                  className={styles.primaryBtn}
+                  className="btn-primary"
                   onClick={() => void runAnalysis()}
                   disabled={aiLoading}
                   aria-busy={aiLoading}
@@ -307,12 +486,22 @@ export default function JobDetailsPage() {
                     ? `Job Relevance Score: ${raw.job_relevance_score}`
                     : "Job Relevance Score"}
                 </button>
+                {job?.companyWebsite && (
+                  <a
+                    href={job.companyWebsite}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-secondary"
+                  >
+                    Visit Company Website
+                  </a>
+                )}
                 {job.applyUrl && (
                   <a
                     href={job.applyUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className={styles.secondaryBtn}
+                    className="btn-secondary"
                   >
                     Apply Now
                   </a>
@@ -322,9 +511,11 @@ export default function JobDetailsPage() {
 
             <section className={styles.section}>
               <h2>📝 Description</h2>
-              <p className={styles.description}>
-                {job.description ? truncateWords(job.description, 500) : "Not Defined"}
-              </p>
+              <div className={styles.description}>
+                {job.description
+                  ? renderRichText(truncateWords(job.description, 500))
+                  : "Not Defined"}
+              </div>
             </section>
 
             <section className={styles.section}>
@@ -342,7 +533,7 @@ export default function JobDetailsPage() {
                         {isCode ? (
                           <pre className={styles.detailCode}>{rendered}</pre>
                         ) : (
-                          rendered
+                          typeof rendered === "string" ? renderTextWithBreaks(rendered) : rendered
                         )}
                       </span>
                     </li>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import Layout from "@/components/Layout/Layout";
 import styles from "./InterviewQuestions.module.css";
 import headerStyles from "../Projects/AddProject.module.css";
@@ -101,11 +101,11 @@ export default function InterviewQuestions() {
         </div>
       </section>
 
-      <form className={styles.formGroup}>
+      <form className="form-group">
         <label htmlFor="usernameInput">Your Name:</label>
         <input
           id="usernameInput"
-          className={styles.textInput}
+          className="form-control"
           placeholder="Enter your name"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
@@ -151,7 +151,7 @@ export default function InterviewQuestions() {
 
               {q.type === "text" && (
                 <input
-                  className={styles.textInput}
+                  className="form-control"
                   placeholder="Your answer"
                   value={answers[i] || ""}
                   onChange={(e) => handleAnswer(i, e.target.value)}
@@ -207,7 +207,7 @@ export default function InterviewQuestions() {
           {/* Title */}
           <h3 className={styles.title}>
             <span className={styles.medal}>
-              {isHighScore ? "🏆" : percent >= 50 ? "🎯" : "💪"}
+              {isHighScore ? "ðŸ†" : percent >= 50 ? "ðŸŽ¯" : "ðŸ’ª"}
             </span>
             {username || "Candidate"}&apos;s Score Card
           </h3>
@@ -215,17 +215,17 @@ export default function InterviewQuestions() {
           {/* Stats Cards */}
           <div className={styles.statsGrid}>
             <div className={styles.statCard}>
-              <div className={styles.statIcon}>✅</div>
+              <div className={styles.statIcon}>âœ…</div>
               <div className={styles.statValue}>{score}</div>
               <div className={styles.statLabel}>Correct</div>
             </div>
             <div className={styles.statCard}>
-              <div className={styles.statIcon}>📝</div>
+              <div className={styles.statIcon}>ðŸ“</div>
               <div className={styles.statValue}>{questions.length}</div>
               <div className={styles.statLabel}>Total</div>
             </div>
             <div className={styles.statCard}>
-              <div className={styles.statIcon}>❌</div>
+              <div className={styles.statIcon}>âŒ</div>
               <div className={styles.statValue}>{questions.length - score}</div>
               <div className={styles.statLabel}>Wrong</div>
             </div>
@@ -235,7 +235,7 @@ export default function InterviewQuestions() {
           <div className={`${styles.badge} ${percent < 50 ? styles.badgeRed : percent < 80 ? styles.badgeSilver : styles.badgeGold}`}>
             <div className={styles.badgeGlow}></div>
             <span className={styles.badgeIcon}>
-              {isHighScore ? "🌟" : percent >= 50 ? "🥈" : "💪"}
+              {isHighScore ? "ðŸŒŸ" : percent >= 50 ? "ðŸ¥ˆ" : "ðŸ’ª"}
             </span>
             <span className={styles.badgeText}>
               {isHighScore ? "Gold Achiever" : percent >= 50 ? "Silver Learner" : "Keep Practicing!"}
@@ -245,10 +245,10 @@ export default function InterviewQuestions() {
           {/* Motivational Message */}
           <p className={styles.message}>
             {isHighScore
-              ? "Outstanding performance! You're a star! 🌟"
+              ? "Outstanding performance! You're a star! ðŸŒŸ"
               : percent >= 50
-                ? "Great effort! You're on the right track! 🚀"
-                : "Don't give up! Practice makes perfect! 💯"}
+                ? "Great effort! You're on the right track! ðŸš€"
+                : "Don't give up! Practice makes perfect! ðŸ’¯"}
           </p>
 
           {/* Action Button */}
@@ -270,9 +270,10 @@ export default function InterviewQuestions() {
           }}
           title={allAnswered ? "Submit answers" : "Please answer all questions"}
         >
-          🚀 Submit Answers
+          ðŸš€ Submit Answers
         </button>
       )}
     </Layout>
   );
 }
+

@@ -541,33 +541,6 @@
   min-width: 220px;
 }
 
-.formGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.label {
-  font-size: 13px;
-  color: var(--color-text);
-  margin: 15px 0 5px 0;
-}
-
-.input,
-.textarea {
-  border: 1px solid var(--color-gray);
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 14px;
-  color: var(--color-text);
-  background: var(--color-white);
-}
-
-.textarea {
-  min-height: 80px;
-  resize: vertical;
-}
-
 .skillsRow {
   display: flex;
   gap: 8px;

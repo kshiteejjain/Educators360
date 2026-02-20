@@ -22,7 +22,7 @@
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(15, 15, 15, 0.08);
-  color: #1b1b1b;
+  color: var(--color-text);
 }
 
 .searchField {
@@ -33,8 +33,13 @@
 
 .searchField label {
   font-weight: 600;
-  color: #1b1b1b;
+  color: var(--color-text);
   font-size: 0.9rem;
+}
+
+.required {
+  color: var(--color-error);
+  margin-left: 4px;
 }
 
 .input {
@@ -43,7 +48,7 @@
   border: 1px solid rgba(0, 0, 0, 0.12);
   font-size: 0.95rem;
   background: #ffffff;
-  color: #1b1b1b;
+  color: var(--color-text);
 }
 
 .input::placeholder {
@@ -72,14 +77,15 @@
 
 .jobsHeader h3 {
   margin: 0;
-  font-size: 1.4rem;
-  color: #1d1f23;
+  font-size: 20px;
+  color: var(--color-text);
+  font-weight: 500;
 }
 
 .countPill {
   padding: 4px 10px;
-  background: #1d1f23;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-white);
   border-radius: 999px;
   font-size: 0.85rem;
 }
@@ -90,12 +96,13 @@
 }
 
 .cardGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 18px;
 }
 
 .card {
+  width: 24%;
   border-radius: 20px;
   padding: 18px;
   background: #fff;
@@ -126,14 +133,9 @@
 }
 
 .postedAt {
-  background: rgba(255, 255, 255, 0.6);
+  background-color: var(--color-blue-gray);
   padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.status {
-  text-align: center;
+  border-radius: 4px;
 }
 
 .cardBody {
@@ -145,26 +147,28 @@
 
 .company {
   margin: 0;
-  font-weight: 600;
-  color: #2b2d31;
+  color: var(--color-text);
 }
 
 .title {
-  margin: 0;
+  margin: 10px 0;
   font-size: 1.1rem;
-  color: #121417;
+  color: var(--color-primary);
+   white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .location {
   margin: 0;
-  color: #5b5f69;
+  color: var(--color-text);
   font-size: 0.9rem;
 }
 
 .tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 10px;
   margin-top: 6px;
 }
 
@@ -172,9 +176,9 @@
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 0.75rem;
-  color: #2a2e35;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: var(--color-text);
+  background-color: var(--color-blue-gray);
+  border: 1px solid var(--color-gray);
 }
 
 .cardFooter {
@@ -184,61 +188,15 @@
   justify-content: space-between;
   padding-top: 16px;
 }
-
-.metaLabel {
-  font-size: 0.85rem;
-  color: #5c5e63;
-}
-
-.detailsHint {
-  font-size: 0.8rem;
-  color: #1d1f23;
-  font-weight: 600;
-}
-
-.tonePeach {
-  background: linear-gradient(145deg, #fde6d2, #fff9f3);
-}
-
-.toneMint {
-  background: linear-gradient(145deg, #dff7ef, #f7fffb);
-}
-
-.toneLavender {
-  background: linear-gradient(145deg, #e6e2ff, #f7f5ff);
-}
-
-.toneSky {
-  background: linear-gradient(145deg, #def0ff, #f5fbff);
-}
-
-.toneSand {
-  background: linear-gradient(145deg, #f8f0d7, #fffcf3);
-}
-
 .loadMoreRow {
   display: flex;
   justify-content: center;
-  margin: 22px 0 10px;
+  margin: 30px 0;
 }
-
-.showMoreBtn {
-  padding: 10px 20px;
-  border-radius: 999px;
-  border: none;
-  background: #1d1f23;
-  color: #ffffff;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+.loadMoreRow button{
+  width: auto;
 }
-
-.showMoreBtn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(29, 31, 35, 0.2);
-}
-
-.showMoreBtn:disabled {
+.btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
@@ -253,4 +211,8 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.view-jobs ol {
+  margin: 0;
 }

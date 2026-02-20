@@ -141,6 +141,9 @@ export default function ResumeBuilder() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [aiResult, setAiResult] = useState<AiResumeResult | null>(null);
   const [uploadFileName, setUploadFileName] = useState("");
+  const [targetJob, setTargetJob] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [manualMode, setManualMode] = useState<"build" | "edit">("build");
   const { withLoader } = useLoader();
 
   const loadTemplate = (id: string) => {
@@ -684,10 +687,22 @@ export default function ResumeBuilder() {
             🚀 Upload Resume
           </button>
           <button
-            className={`${styles.tabButton} ${activeTab === "manual" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("manual")}
+            className={`${styles.tabButton} ${activeTab === "manual" && manualMode === "build" ? styles.tabActive : ""}`}
+            onClick={() => {
+              setActiveTab("manual");
+              setManualMode("build");
+            }}
           >
-            ✏️ Build Manually
+            💼 Build Manually
+          </button>
+          <button
+            className={`${styles.tabButton} ${activeTab === "manual" && manualMode === "edit" ? styles.tabActive : ""}`}
+            onClick={() => {
+              setActiveTab("manual");
+              setManualMode("edit");
+            }}
+          >
+            ✏️ Edit Resume
           </button>
         </div>
 
@@ -702,6 +717,31 @@ export default function ResumeBuilder() {
                   <p className={styles.uploadHint}>
                     Upload a PDF or DOCX. We will extract the text before sending it to AI.
                   </p>
+                  <div className="form-group">
+                    <label  htmlFor="target-job">
+                      Target Job
+                    </label>
+                    <input
+                      id="target-job"
+                      type="text"
+                      className="form-control"
+                      value={targetJob}
+                      onChange={(e) => setTargetJob(e.target.value)}
+                      placeholder="e.g. Primary English Teacher"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label  htmlFor="job-description">
+                      Job Description
+                    </label>
+                    <textarea
+                      id="job-description"
+                      className="form-control"
+                      value={jobDescription}
+                      onChange={(e) => setJobDescription(e.target.value)}
+                      placeholder="Paste the job description here..."
+                    />
+                  </div>
                   <div className={styles.uploadRow}>
                     <label className={styles.fileButton}>
                       📄 Upload your resume here
@@ -804,55 +844,55 @@ export default function ResumeBuilder() {
                   <summary className={styles.accordionHeader}>Basic Info</summary>
                   <div className={styles.accordionBody}>
                     <div className={styles.formGrid}>
-                      <div className={styles.formGroup}>
-                        <label className={styles.label}>Full Name</label>
+                      <div className="form-group">
+                        <label >Full Name</label>
                         <input
-                          className={`${styles.input}`}
+                          className="form-control"
                           value={form.name}
                           placeholder="Jane Doe"
                           onChange={(e) => updateField("name", e.target.value)}
                         />
                       </div>
-                      <div className={styles.formGroup}>
-                        <label className={styles.label}>Title</label>
+                      <div className="form-group">
+                        <label >Title</label>
                         <input
-                          className={styles.input}
+                          className="form-control"
                           value={form.title}
                           placeholder="Product Manager"
                           onChange={(e) => updateField("title", e.target.value)}
                         />
                       </div>
-                      <div className={styles.formGroup}>
-                        <label className={styles.label}>Location</label>
+                      <div className="form-group">
+                        <label >Location</label>
                         <input
-                          className={styles.input}
+                          className="form-control"
                           value={form.location}
                           placeholder="City, Country"
                           onChange={(e) => updateField("location", e.target.value)}
                         />
                       </div>
-                      <div className={styles.formGroup}>
-                        <label className={styles.label}>Email</label>
+                      <div className="form-group">
+                        <label >Email</label>
                         <input
-                          className={styles.input}
+                          className="form-control"
                           value={form.email}
                           placeholder="you@example.com"
                           onChange={(e) => updateField("email", e.target.value)}
                         />
                       </div>
-                      <div className={styles.formGroup}>
-                        <label className={styles.label}>Phone</label>
+                      <div className="form-group">
+                        <label >Phone</label>
                         <input
-                          className={styles.input}
+                          className="form-control"
                           value={form.phone}
                           placeholder="+1 234 567 8901"
                           onChange={(e) => updateField("phone", e.target.value)}
                         />
                       </div>
-                      <div className={styles.formGroup}>
-                        <label className={styles.label}>Photo URL (optional)</label>
+                      <div className="form-group">
+                        <label >Photo URL (optional)</label>
                         <input
-                          className={styles.input}
+                          className="form-control"
                           value={form.photo || ""}
                           placeholder="https://example.com/photo.jpg"
                           onChange={(e) => updateField("photo", e.target.value)}
@@ -874,10 +914,10 @@ export default function ResumeBuilder() {
                 <details className={styles.accordion}>
                   <summary className={styles.accordionHeader}>Profile Summary</summary>
                   <div className={styles.accordionBody}>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Profile Summary</label>
+                    <div className="form-group">
+                      <label >Profile Summary</label>
                       <textarea
-                        className={styles.textarea}
+                        className="form-control"
                         value={form.summary}
                         placeholder="Summarize your experience and value in 3-5 sentences."
                         onChange={(e) => updateField("summary", e.target.value)}
@@ -889,11 +929,11 @@ export default function ResumeBuilder() {
                 <details className={styles.accordion}>
                   <summary className={styles.accordionHeader}>Skills</summary>
                   <div className={styles.accordionBody}>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Skills (tags)</label>
+                    <div className="form-group">
+                      <label >Skills (tags)</label>
                       <div className={styles.skillsRow}>
                         <input
-                          className={`${styles.input} ${styles.skillInput}`}
+                          className={`form-control ${styles.skillInput}`}
                           value={skillInput}
                           placeholder="e.g., React, SQL, Leadership"
                           onChange={(e) => setSkillInput(e.target.value)}
@@ -950,11 +990,11 @@ export default function ResumeBuilder() {
                 <details className={styles.accordion}>
                   <summary className={styles.accordionHeader}>Languages</summary>
                   <div className={styles.accordionBody}>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Languages</label>
+                    <div className="form-group">
+                      <label >Languages</label>
                       <div className={styles.skillsRow}>
                         <input
-                          className={styles.input}
+                          className="form-control"
                           value={languageInput}
                           placeholder="e.g., English, Hindi"
                           onChange={(e) => setLanguageInput(e.target.value)}
@@ -986,43 +1026,43 @@ export default function ResumeBuilder() {
                 <details className={styles.accordion}>
                   <summary className={styles.accordionHeader}>Experience</summary>
                   <div className={styles.accordionBody}>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Experiences</label>
+                    <div className="form-group">
+                      <label >Experiences</label>
                       {form.experiences.map((exp, idx) => (
                         <div key={idx} className={styles.card} style={{ padding: 12, marginBottom: 8 }}>
                           <div className={styles.formGrid}>
-                            <div className={styles.formGroup}>
-                              <label className={styles.label}>Role</label>
+                            <div className="form-group">
+                              <label >Role</label>
                               <input
-                                className={styles.input}
+                                className="form-control"
                                 value={exp.role}
                                 onChange={(e) => updateExperience(idx, "role", e.target.value)}
                                 placeholder="Job Title"
                               />
                             </div>
-                            <div className={styles.formGroup}>
-                              <label className={styles.label}>Company</label>
+                            <div className="form-group">
+                              <label >Company</label>
                               <input
-                                className={styles.input}
+                                className="form-control"
                                 value={exp.company}
                                 onChange={(e) => updateExperience(idx, "company", e.target.value)}
                                 placeholder="Company"
                               />
                             </div>
-                            <div className={styles.formGroup}>
-                              <label className={styles.label}>Dates</label>
+                            <div className="form-group">
+                              <label >Dates</label>
                               <input
-                                className={styles.input}
+                                className="form-control"
                                 value={exp.dates}
                                 onChange={(e) => updateExperience(idx, "dates", e.target.value)}
                                 placeholder="2023 - Present"
                               />
                             </div>
                           </div>
-                          <div className={styles.formGroup}>
-                            <label className={styles.label}>Highlights (one per line)</label>
+                          <div className="form-group">
+                            <label >Highlights (one per line)</label>
                             <textarea
-                              className={styles.textarea}
+                              className="form-control"
                               value={exp.bullets.join("\n")}
                               onChange={(e) =>
                                 updateExperience(idx, "bullets", e.target.value.split("\n").filter(Boolean))
@@ -1038,33 +1078,33 @@ export default function ResumeBuilder() {
                 <details className={styles.accordion}>
                   <summary className={styles.accordionHeader}>Education</summary>
                   <div className={styles.accordionBody}>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Education</label>
+                    <div className="form-group">
+                      <label >Education</label>
                       {form.education.map((edu, idx) => (
                         <div key={idx} className={styles.card} style={{ padding: 12, marginBottom: 8 }}>
                           <div className={styles.formGrid}>
-                            <div className={styles.formGroup}>
-                              <label className={styles.label}>School</label>
+                            <div className="form-group">
+                              <label >School</label>
                               <input
-                                className={styles.input}
+                                className="form-control"
                                 value={edu.school}
                                 onChange={(e) => updateEducation(idx, "school", e.target.value)}
                                 placeholder="University Name"
                               />
                             </div>
-                            <div className={styles.formGroup}>
-                              <label className={styles.label}>Degree</label>
+                            <div className="form-group">
+                              <label >Degree</label>
                               <input
-                                className={styles.input}
+                                className="form-control"
                                 value={edu.degree}
                                 onChange={(e) => updateEducation(idx, "degree", e.target.value)}
                                 placeholder="Degree / Major"
                               />
                             </div>
-                            <div className={styles.formGroup}>
-                              <label className={styles.label}>Dates</label>
+                            <div className="form-group">
+                              <label >Dates</label>
                               <input
-                                className={styles.input}
+                                className="form-control"
                                 value={edu.dates}
                                 onChange={(e) => updateEducation(idx, "dates", e.target.value)}
                                 placeholder="2019 - 2023"
@@ -1137,6 +1177,10 @@ export default function ResumeBuilder() {
     </Layout>
   );
 }
+
+
+
+
 
 
 
