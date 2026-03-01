@@ -38,6 +38,8 @@ export default function ViewJobs() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const { withLoader } = useLoader();
   const storageKey = "viewJobsState";
+  const isSearchDisabled = !role.trim();
+  const shouldShowSearch = !error && !isSearchDisabled;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -156,7 +158,7 @@ export default function ViewJobs() {
       <form className={styles.searchForm} onSubmit={handleSearch}>
         <div className={styles.searchField}>
           <label htmlFor="jobRole">
-            Job Role <span className={styles.required}>*</span>
+            Target Role <span className={styles.required}>*</span>
           </label>
           <input
             id="jobRole"
@@ -197,9 +199,11 @@ export default function ViewJobs() {
             className={styles.input}
           />
         </div>
-        <button type="submit" className="btn-primary">
-          Search
-        </button>
+        {shouldShowSearch && (
+          <button type="submit" className="btn-primary">
+            Search
+          </button>
+        )}
       </form>
 
       {error ? (

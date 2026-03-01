@@ -53,6 +53,12 @@
   font-size: 0.9rem;
 }
 
+.fieldError {
+  margin: 6px 0 0;
+  color: #dc2626;
+  font-size: 0.8rem;
+}
+
 /* Results Section */
 .resultsSection {
   animation: fadeIn 0.4s ease;

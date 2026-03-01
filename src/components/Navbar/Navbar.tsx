@@ -35,7 +35,7 @@ export default function Navbar() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem("userJobPrefix");
+      const raw = window.localStorage.getItem("upeducateJobPrefix");
       if (!raw) return;
       const parsed = JSON.parse(raw) as StoredUser;
       setStoredUser(parsed ?? null);
@@ -93,7 +93,7 @@ export default function Navbar() {
                 onClick={() => {
                   clearSession();
                   if (typeof window !== "undefined") {
-                    window.localStorage.removeItem("userJobPrefix");
+                    window.localStorage.removeItem("upeducateJobPrefix");
                   }
                   setOpen(false);
                   push("/login");

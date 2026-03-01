@@ -28,10 +28,9 @@ type ParsedQuestion = {
 
 type ViewMode = "cards" | "questions" | "report";
 
-const DEFAULT_CV_TEXT = "Not provided.";
-const DEFAULT_TARGET_ROLE = "Senior Secondary Coordinator";
 const STORAGE_PREFIX = "assessment:questions:";
 const REPORT_PREFIX = "assessment:report:";
+const JOB_PREFIX_KEY = "upeducateJobPrefix";
 
 const normalizeLine = (line: string) => line.replace(/\s+/g, " ").trim();
 
@@ -59,7 +58,9 @@ const parseQuestions = (content: string): ParsedQuestion[] => {
   };
 
   lines.forEach((line) => {
-    const qMatch = line.match(/^(?:\*\*)?\s*(\d{1,2})[\.)-]\s*(.+)$/i);
+    const qMatch =
+      line.match(/^(?:\*\*)?\s*(\d{1,2})[\.)-]\s*(.+)$/i) ||
+      line.match(/^(?:\*\*)?\s*(?:question|q)\s*(\d{1,2})\s*[:\.)-]\s*(.+)$/i);
     const whyMatch = line.match(/^(?:\*\*)?(?:why this matters)\s*[:\-]?\s*(.+)$/i);
 
     if (qMatch) {
@@ -91,6 +92,26 @@ const parseQuestions = (content: string): ParsedQuestion[] => {
 const getSessionKey = (cardId: string) => `${STORAGE_PREFIX}${cardId}`;
 const getReportKey = (cardId: string) => `${REPORT_PREFIX}${cardId}`;
 
+const readStoredProfile = () => {
+  if (typeof window === "undefined") {
+    return { targetRole: "", cvText: "" };
+  }
+  try {
+    const raw = window.localStorage.getItem(JOB_PREFIX_KEY);
+    if (!raw) return { targetRole: "", cvText: "" };
+    const data = JSON.parse(raw) as {
+      targetRole?: string;
+      resume?: { data?: { summary?: string } };
+    };
+    const targetRole = (data?.targetRole ?? "").trim();
+    const cvText = (data?.resume?.data?.summary ?? "").trim();
+    return { targetRole, cvText };
+  } catch (error) {
+    console.warn("Failed to read stored profile", error);
+    return { targetRole: "", cvText: "" };
+  }
+};
+
 const buildPairedResponses = (
   questions: ParsedQuestion[],
   answers: Record<string, string>
@@ -107,7 +128,7 @@ const buildPairedResponses = (
 
 const formatInline = (value: string) => {
   const parts: Array<{ text: string; bold?: boolean }> = [];
-  const regex = /\*\*(.+?)\*\*/g;
+  const regex = /(\*\*[^*]+\*\*)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -115,8 +136,9 @@ const formatInline = (value: string) => {
     if (match.index > lastIndex) {
       parts.push({ text: value.slice(lastIndex, match.index) });
     }
-    parts.push({ text: match[1], bold: true });
-    lastIndex = match.index + match[0].length;
+    const token = match[0];
+    parts.push({ text: token.slice(2, -2), bold: true });
+    lastIndex = match.index + token.length;
   }
   if (lastIndex < value.length) {
     parts.push({ text: value.slice(lastIndex) });
@@ -132,6 +154,69 @@ const renderInline = (value: string) =>
       <span key={`t-${index}`}>{part.text}</span>
     )
   );
+
+const renderRichText = (value: string) => {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const blocks: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+
+  const sanitizeLine = (line: string) => {
+    let next = line;
+    next = next.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, "$1$2");
+    const boldCount = (next.match(/\*\*/g) || []).length;
+    if (boldCount % 2 !== 0) {
+      next = next.replace(/\*\*/g, "");
+    }
+    return next;
+  };
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    blocks.push(
+      <ul key={`list-${blocks.length}`} className={styles.richList}>
+        {listItems}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  lines.forEach((line, index) => {
+    const trimmedLine = sanitizeLine(line.replace(/^\*\s+/, "").trim());
+    const headingMatch = trimmedLine.match(/^#{1,6}\s+(.*)$/);
+    if (headingMatch) {
+      flushList();
+      blocks.push(
+        <div key={`h-${index}`} className={styles.richHeading}>
+          {renderInline(headingMatch[1])}
+        </div>
+      );
+      return;
+    }
+
+    const bulletMatch = trimmedLine.match(/^-+\s+(.*)$/);
+    if (bulletMatch) {
+      listItems.push(
+        <li key={`li-${index}`} className={styles.richListItem}>
+          {renderInline(bulletMatch[1])}
+        </li>
+      );
+      return;
+    }
+
+    flushList();
+    blocks.push(
+      <p key={`p-${index}`} className={styles.richParagraph}>
+        {renderInline(trimmedLine)}
+      </p>
+    );
+  });
+
+  flushList();
+  return blocks;
+};
 
 const renderScoreRow = (label: string, score: number, note?: string) => {
   const safeScore = Math.max(0, Math.min(10, score));
@@ -154,101 +239,120 @@ const renderScoreRow = (label: string, score: number, note?: string) => {
   );
 };
 
+type ReportSection = {
+  title: string;
+  lines: string[];
+};
+
+const parseReportSections = (text: string) => {
+  const lines = text.split(/\r?\n/).map((line) => line.trim());
+  let title = "";
+  const sections: ReportSection[] = [];
+  let current: ReportSection | null = null;
+
+  const flush = () => {
+    if (!current) return;
+    const cleaned = current.lines.filter(Boolean);
+    if (cleaned.length > 0) {
+      sections.push({ title: current.title, lines: cleaned });
+    }
+    current = null;
+  };
+
+  for (const line of lines) {
+    if (!line) continue;
+    if (!title) {
+      title = line.replace(/^#+\s*/, "");
+      continue;
+    }
+    const headingMatch = line.match(/^\d+\.\s+(.+)$/);
+    const conclusionMatch = line.match(/^conclusion$/i);
+    if (headingMatch || conclusionMatch) {
+      flush();
+      current = {
+        title: headingMatch ? headingMatch[1].trim() : "Conclusion",
+        lines: [],
+      };
+      continue;
+    }
+    if (!current) {
+      current = { title: "Overview", lines: [] };
+    }
+    current.lines.push(line);
+  }
+
+  flush();
+  return { title, sections };
+};
+
 const renderReport = (text: string) => {
-  const lines = text.split(/\r?\n/);
-  const nodes: React.ReactNode[] = [];
-  let pendingScoreLabel: string | null = null;
-  let pendingScoreValue: number | null = null;
+  const parsed = parseReportSections(text);
+  if (!parsed.sections.length) return null;
 
-  lines.forEach((line, index) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      nodes.push(<div key={`space-${index}`} className={styles.reportSpacer} />);
-      return;
-    }
-
-    const headingMatch = trimmed.match(/^(#+)\s*(.+)$/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const title = headingMatch[2];
-      if (level === 1) {
-        nodes.push(
-          <h2 key={`h2-${index}`} className={styles.reportH2}>
-            {renderInline(title)}
-          </h2>
-        );
-        return;
-      }
-      if (level === 2) {
-        nodes.push(
-          <h3 key={`h3-${index}`} className={styles.reportH3}>
-            {renderInline(title)}
-          </h3>
-        );
-        return;
-      }
-      nodes.push(
-        <h4 key={`h4-${index}`} className={styles.reportH4}>
-          {renderInline(title)}
-        </h4>
-      );
-      return;
-    }
-
-    const scoreMatch = trimmed.match(
-      /^\*\*(.+?)\*\*\s*[:\-]?\s*(\d{1,2})\s*\/\s*10\s*(.*)$/
-    );
-    if (scoreMatch) {
-      const label = scoreMatch[1].trim();
-      const score = Number(scoreMatch[2]);
-      const note = scoreMatch[3]?.trim();
-      nodes.push(renderScoreRow(label, score, note));
-      pendingScoreLabel = null;
-      pendingScoreValue = null;
-      return;
-    }
-
-    const inlineScoreMatch = trimmed.match(/^(.+?)\s*[:\-]\s*(\d{1,2})\s*\/\s*10\s*$/);
-    if (inlineScoreMatch) {
-      pendingScoreLabel = inlineScoreMatch[1].trim().replace(/^\*\*|\*\*$/g, "");
-      pendingScoreValue = Number(inlineScoreMatch[2]);
-      return;
-    }
-
-    if (pendingScoreLabel && pendingScoreValue !== null) {
-      nodes.push(renderScoreRow(pendingScoreLabel, pendingScoreValue, trimmed));
-      pendingScoreLabel = null;
-      pendingScoreValue = null;
-      return;
-    }
-
-    if (trimmed.startsWith("- ")) {
-      nodes.push(
-        <p key={`bullet-${index}`} className={styles.reportBullet}>
-          • {renderInline(trimmed.slice(2))}
+  return (
+    <div className={styles.reportLayout}>
+      <div className={styles.reportHero}>
+        <h2 className={styles.reportH2}>{renderInline(parsed.title || "Report")}</h2>
+        <p className={styles.reportParagraph}>
+          A structured snapshot of strengths, growth areas, and next steps.
         </p>
-      );
-      return;
-    }
+      </div>
 
-    const numberMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
-    if (numberMatch) {
-      nodes.push(
-        <p key={`num-${index}`} className={styles.reportBullet}>
-          {numberMatch[1]}. {renderInline(numberMatch[2])}
-        </p>
-      );
-      return;
-    }
+      <div className={styles.reportGrid}>
+        {parsed.sections.map((section, index) => {
+          const isScorecard = section.title.toLowerCase().includes("scorecard");
+          if (isScorecard) {
+            const scoreLines = section.lines
+              .map((line) => line.replace(/^[-•]\s*/, ""))
+              .map((line) => {
+                const match = line.match(/^(.+?)\s*:\s*(\d{1,2})\s*$/);
+                if (!match) return null;
+                return { label: match[1].trim(), score: Number(match[2]) };
+              })
+              .filter(Boolean) as Array<{ label: string; score: number }>;
 
-    nodes.push(
-      <p key={`p-${index}`} className={styles.reportParagraph}>
-        {renderInline(trimmed)}
-      </p>
-    );
-  });
+            return (
+              <div key={`section-${index}`} className={styles.reportCard}>
+                <div className={styles.reportCardHeader}>
+                  <span className={styles.reportTag}>Scorecard</span>
+                  <h3 className={styles.reportCardTitle}>{renderInline(section.title)}</h3>
+                </div>
+                <div className={styles.scoreGrid}>
+                  {scoreLines.map((item) => renderScoreRow(item.label, item.score))}
+                </div>
+              </div>
+            );
+          }
 
-  return nodes;
+          const bullets = section.lines.filter((line) => /^[-•]\s+/.test(line));
+          const paragraphs = section.lines.filter((line) => !/^[-•]\s+/.test(line));
+
+          return (
+            <div key={`section-${index}`} className={styles.reportCard}>
+              <div className={styles.reportCardHeader}>
+                <span className={styles.reportTag}>Section {index + 1}</span>
+                <h3 className={styles.reportCardTitle}>{renderInline(section.title)}</h3>
+              </div>
+              {paragraphs.map((line, pIndex) => (
+                <p key={`p-${index}-${pIndex}`} className={styles.reportParagraph}>
+                  {renderInline(line.replace(/^[-•]\s*/, ""))}
+                </p>
+              ))}
+              {bullets.length > 0 && (
+                <ul className={styles.reportList}>
+                  {bullets.map((line, bIndex) => (
+                    <li key={`b-${index}-${bIndex}`} className={styles.reportListItem}>
+                      {renderInline(line.replace(/^[-•]\s*/, ""))}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 export default function Assessment() {
@@ -289,6 +393,15 @@ export default function Assessment() {
     setActiveCardId(cardId);
     setView("questions");
 
+    const { targetRole, cvText } = readStoredProfile();
+    const missing: string[] = [];
+    if (!targetRole) missing.push("target role");
+    if (!cvText) missing.push("CV summary");
+    if (missing.length > 0) {
+      setError(`Missing ${missing.join(" and ")}. Please update your profile first.`);
+      return;
+    }
+
     const cached = sessionStorage.getItem(getSessionKey(cardId));
     if (cached) {
       setResult(cached);
@@ -300,8 +413,8 @@ export default function Assessment() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cvText: DEFAULT_CV_TEXT,
-          targetRole: DEFAULT_TARGET_ROLE,
+          cvText,
+          targetRole,
         }),
       });
       const data = (await response.json()) as AssessmentResponse;
@@ -342,6 +455,15 @@ export default function Assessment() {
       return;
     }
 
+    const { targetRole, cvText } = readStoredProfile();
+    const missing: string[] = [];
+    if (!targetRole) missing.push("target role");
+    if (!cvText) missing.push("CV summary");
+    if (missing.length > 0) {
+      setError(`Missing ${missing.join(" and ")}. Please update your profile first.`);
+      return;
+    }
+
     setError("");
     const pairs = buildPairedResponses(questions, answers);
 
@@ -357,8 +479,8 @@ export default function Assessment() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          targetRole: DEFAULT_TARGET_ROLE,
-          cvText: DEFAULT_CV_TEXT,
+          targetRole,
+          cvText,
           pairedResponses: pairs,
         }),
       });
@@ -422,11 +544,11 @@ export default function Assessment() {
               {questions.map((item, index) => (
                 <div key={item.id} className={styles.questionCard}>
                   <div className={styles.questionMeta}>Question {index + 1}</div>
-                  <p className={styles.questionText}>{renderInline(item.question)}</p>
+                  <div className={styles.questionText}>{renderRichText(item.question)}</div>
                   {item.why && (
-                    <p className={styles.questionWhy}>
-                      <strong>Why this matters:</strong> {renderInline(item.why)}
-                    </p>
+                    <div className={styles.questionWhy}>
+                      <strong>Why this matters:</strong> {renderRichText(item.why)}
+                    </div>
                   )}
                   <textarea
                     className={styles.answerInput}

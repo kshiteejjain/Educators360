@@ -85,15 +85,15 @@
   line-height: 1.7;
 }
 
-.description ol {
+.description ul {
   margin: 0 0 0 15px;
 }
 
-.description ol li{
+.description ul li{
   font-size: calc(var(--font-size-base) - 1px);
   margin: 10px 0;
 }
-.description ol li p{
+.description ul li p{
   font-size: calc(var(--font-size-base) - 1px);
 }
 

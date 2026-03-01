@@ -58,18 +58,26 @@ export default function LinkedinAnalysis() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{
+    linkedinUrl?: string;
+    targetRole?: string;
+  }>({});
   const { withLoader } = useLoader();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
 
+    const nextErrors: { linkedinUrl?: string; targetRole?: string } = {};
     if (!linkedinUrl.trim()) {
-      setError("Please enter a valid LinkedIn profile URL");
-      return;
+      nextErrors.linkedinUrl = "Please enter a valid LinkedIn profile URL";
     }
     if (!targetRole.trim()) {
-      setError("Please enter a target role");
+      nextErrors.targetRole = "Please enter a target role";
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
       return;
     }
 
@@ -169,33 +177,59 @@ export default function LinkedinAnalysis() {
           <form onSubmit={handleSubmit} className={styles.form}>
             <div className="form-group">
               <label htmlFor="linkedinUrl">
-                Enter Your LinkedIn Profile URL
+                Enter Your LinkedIn Profile URL *
               </label>
               <input
                 id="linkedinUrl"
                 type="url"
                 value={linkedinUrl}
-                onChange={(e) => setLinkedinUrl(e.target.value)}
+                onChange={(e) => {
+                  setLinkedinUrl(e.target.value);
+                  if (fieldErrors.linkedinUrl) {
+                    setFieldErrors((prev) => ({ ...prev, linkedinUrl: undefined }));
+                  }
+                }}
                 placeholder="https://www.linkedin.com/in/yourprofile/"
                 className="form-control"
                 disabled={isLoading}
+                aria-invalid={Boolean(fieldErrors.linkedinUrl)}
+                aria-describedby={fieldErrors.linkedinUrl ? "linkedin-url-error" : undefined}
+                required
               />
               <p className={styles.hint}>Example: https://www.linkedin.com/in/kshiteejjain/</p>
+              {fieldErrors.linkedinUrl && (
+                <p id="linkedin-url-error" className={styles.fieldError}>
+                  {fieldErrors.linkedinUrl}
+                </p>
+              )}
             </div>
             <div className="form-group">
               <label htmlFor="targetRole">
-                Target Role
+                Target Role *
               </label>
               <input
                 id="targetRole"
                 type="text"
                 value={targetRole}
-                onChange={(e) => setTargetRole(e.target.value)}
+                onChange={(e) => {
+                  setTargetRole(e.target.value);
+                  if (fieldErrors.targetRole) {
+                    setFieldErrors((prev) => ({ ...prev, targetRole: undefined }));
+                  }
+                }}
                 placeholder="e.g., Maths Teacher"
                 className="form-control"
                 disabled={isLoading}
+                aria-invalid={Boolean(fieldErrors.targetRole)}
+                aria-describedby={fieldErrors.targetRole ? "target-role-error" : undefined}
+                required
               />
               <p className={styles.hint}>Example: Role you are looking for</p>
+              {fieldErrors.targetRole && (
+                <p id="target-role-error" className={styles.fieldError}>
+                  {fieldErrors.targetRole}
+                </p>
+              )}
             </div>
 
             <button type="submit" className="btn-primary" disabled={isLoading}>

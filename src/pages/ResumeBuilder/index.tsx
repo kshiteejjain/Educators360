@@ -1,5 +1,6 @@
-﻿import { useMemo, useState, useRef } from "react";
-import Image from "next/image";
+﻿import { useMemo, useState, useRef, useEffect } from "react";
+import Image, { type StaticImageData } from "next/image";
+import type { FormEvent } from "react";
 import Layout from "@/components/Layout/Layout";
 import styles from "./ResumeBuilder.module.css";
 import { useLoader } from "@/components/Loader/LoaderProvider";
@@ -7,6 +8,10 @@ import { getSession } from "@/utils/authSession";
 import { getDb } from "@/utils/firebase";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
+import placeholderTeacher from "../../../public/placeholder-teacher.jpg";
+import morden from "../../../public/morden.png";
+import classic from "../../../public/classic.png";
+import minimal from "../../../public/minimal.png";
 
 type Experience = {
   role: string;
@@ -33,7 +38,7 @@ type ResumeTemplate = {
   location: string;
   email: string;
   phone: string;
-  photo?: string;
+  photo?: string | StaticImageData;
   summary: string;
   skills: SkillItem[];
   languages: string[];
@@ -55,13 +60,12 @@ type AiResumeResult = {
 const templates: ResumeTemplate[] = [
   {
     id: "navy",
-    name: "Kshiteej Jain",
+    name: "Anjali Shaw",
     title: "High School English Teacher",
-    location: "Austin, TX",
-    email: "kshitejjain@gmail.com",
+    location: "Pune, Maharashtra",
+    email: "anjalishaw@gmail.com",
     phone: "+91 123-456-7890",
-    photo:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+    photo: placeholderTeacher,
     summary:
       "Student-centered English teacher with 6+ years of experience designing engaging curriculum, improving literacy outcomes, and fostering inclusive classrooms. Skilled in differentiated instruction, data-informed lesson planning, and parent collaboration.",
     skills: [
@@ -136,6 +140,7 @@ export default function ResumeBuilder() {
   const previewRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<"upload" | "manual">("upload");
   const [previewTemplate, setPreviewTemplate] = useState<"navy" | "clean" | "slate">("navy");
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
@@ -144,7 +149,28 @@ export default function ResumeBuilder() {
   const [targetJob, setTargetJob] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [manualMode, setManualMode] = useState<"build" | "edit">("build");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { withLoader } = useLoader();
+  const aiResultRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (aiResult && aiResultRef.current) {
+      aiResultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [aiResult]);
+
+  useEffect(() => {
+    const trimmed = targetJob.trim();
+    if (!trimmed || typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem("upeducateJobPrefix");
+      const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      const next = { ...existing, targetRole: trimmed };
+      window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(next));
+    } catch (error) {
+      console.warn("Failed to store target role", error);
+    }
+  }, [targetJob]);
 
   const loadTemplate = (id: string) => {
     const tpl = templates.find((t) => t.id === id) ?? templates[0];
@@ -279,7 +305,14 @@ export default function ResumeBuilder() {
         import("jspdf"),
       ]);
 
-      const canvas = await html2canvas(previewRef.current, {
+      if ("fonts" in document) {
+        await (document as Document & { fonts: FontFaceSet }).fonts.ready;
+      }
+
+      const target = previewRef.current;
+      if (!target) return;
+
+      const canvas = await html2canvas(target, {
         useCORS: true,
         scale: 2,
         backgroundColor: null,
@@ -291,15 +324,13 @@ export default function ResumeBuilder() {
         unit: "pt",
         format: "a4",
       });
-
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+      const ratio = pageWidth / canvas.width;
       const imgWidth = canvas.width * ratio;
       const imgHeight = canvas.height * ratio;
-      const x = (pageWidth - imgWidth) / 2;
+      const x = 0;
       const y = 0;
-
       pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
 
       const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
@@ -384,12 +415,31 @@ export default function ResumeBuilder() {
       setIsExtracting(false);
     }
 
+  };
+
+  const handleUploadSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    runAiReview();
+  };
+
+  const runAiReview = async () => {
+    if (!extractedText) {
+      setUploadError("Please upload a resume first.");
+      return;
+    }
+    if (isAnalyzing) return;
+    setUploadError(null);
+    setIsAnalyzing(true);
     try {
       await withLoader(async () => {
         const response = await fetch("/api/resumeImprove", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({
+            userResume: extractedText,
+            targetJob: targetJob.trim(),
+            jobDescription: jobDescription.trim(),
+          }),
         });
         const data = (await response.json()) as AiResumeResult & { message?: string };
         if (!response.ok) {
@@ -426,6 +476,8 @@ export default function ResumeBuilder() {
       setUploadError(
         error instanceof Error ? error.message : "Failed to generate AI improvements."
       );
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -434,132 +486,74 @@ export default function ResumeBuilder() {
     return `${"★".repeat(safe)}${"☆".repeat(5 - safe)}`;
   };
 
-  const renderNavyTemplate = () => (
-    <div ref={previewRef} className={styles.navyWrapper}>
-      <div className={styles.navySidebar}>
-        {form.photo && (
+  const renderAiItem = (item: unknown) => {
+    if (typeof item === "string") return item;
+    if (item && typeof item === "object" && "name" in item) {
+      const name = (item as { name?: unknown }).name;
+      return typeof name === "string" ? name : JSON.stringify(item);
+    }
+    return String(item ?? "");
+  };
+
+  const templateOptions = [
+    {
+      id: "navy",
+      label: "Classic",
+      description: "Educator-focused classic layout",
+      image: classic,
+    },
+    {
+      id: "clean",
+      label: "Minimal White",
+      description: "Bright, minimal white layout",
+      image: minimal,
+    },
+    {
+      id: "slate",
+      label: "Modern Slate",
+      description: "Modern slate style with bold typography",
+      image: morden,
+    },
+  ] as const;
+
+  const resolvePhotoSrc = (photo?: string | StaticImageData) => {
+    if (typeof photo === "string") {
+      const trimmed = photo.trim();
+      return trimmed ? trimmed : placeholderTeacher;
+    }
+    return photo ?? placeholderTeacher;
+  };
+
+  const renderNavyTemplate = () => {
+    const photoSrc = resolvePhotoSrc(form.photo);
+    return (
+      <div ref={previewRef} className={styles.navyWrapper}>
+        <div className={styles.navySidebar}>
           <div className={styles.photoCircle}>
-            <Image src={form.photo} alt="Profile" width={120} height={120} />
+            <Image src={photoSrc} alt="Profile" width={120} height={120} />
           </div>
-        )}
-        <div className={styles.sidebarBlock}>
-          <h4>CONTACT</h4>
-          <ul>
-            <li>{form.phone}</li>
-            <li>{form.email}</li>
-            <li>{form.location}</li>
-          </ul>
-        </div>
-        <div className={styles.sidebarBlock}>
-          <h4>EDUCATION</h4>
-          <ul>
-            {form.education.map((edu, idx) => (
-              <li key={idx}>
-                <div className={styles.bold}>{edu.school}</div>
-                <div>{edu.degree}</div>
-                <div>{edu.dates}</div>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className={styles.sidebarBlock}>
-          <h4>SKILLS</h4>
-          <ul>
-            {form.skills.map((skill, idx) => (
-              <li key={idx} className={styles.skillRow}>
-                <span className={styles.skillName}>{skill.name}</span>
-                <span className={styles.skillStars}>{renderStars(skill.rating)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className={styles.sidebarBlock}>
-          <h4>LANGUAGES</h4>
-          <ul>
-            {form.languages.map((lang, idx) => (
-              <li key={idx}>{lang}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div className={styles.navyMain}>
-        <div className={styles.navyHeaderText}>
-          <div className={styles.resumeName}>{form.name}</div>
-          <div className={styles.resumeTitle}>{form.title}</div>
-        </div>
-
-        <div className={styles.divider} />
-
-        <div className={styles.resumeSection}>
-          <h4>PROFILE</h4>
-          <div className={styles.resumeList} style={{ listStyle: "none", paddingLeft: 0 }}>
-            <div>{form.summary}</div>
+          <div className={styles.sidebarBlock}>
+            <h4>CONTACT</h4>
+            <ul>
+              <li>{form.phone}</li>
+              <li>{form.email}</li>
+              <li>{form.location}</li>
+            </ul>
           </div>
-        </div>
-
-        <div className={styles.resumeSection}>
-          <h4>WORK EXPERIENCE</h4>
-          <ul className={styles.resumeList}>
-            {form.experiences.map((exp, idx) => (
-              <li key={idx}>
-                <div className={styles.resumeItemTitle}>{exp.company}</div>
-                <div className={styles.resumeTitleSmall}>{exp.role}</div>
-                <div className={styles.resumeMeta}>{exp.dates}</div>
-                <ul className={styles.resumeList}>
-                  {exp.bullets.map((b, i) => (
-                    <li key={i}>{b}</li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-      </div>
-    </div>
-  );
-
-  const renderCleanTemplate = () => (
-    <div ref={previewRef} className={styles.cleanWrapper}>
-      <div className={styles.cleanHeader}>
-        <div>
-          <div className={styles.cleanName}>{form.name}</div>
-          <div className={styles.cleanTitle}>{form.title}</div>
-        </div>
-        <div className={styles.cleanMeta}>
-          <span>✉ {form.email}</span>
-          <span>☎ {form.phone}</span>
-          <span>📍 {form.location}</span>
-        </div>
-      </div>
-      <div className={styles.cleanDivider} />
-      <div className={styles.cleanGrid}>
-        <div>
-          <div className={styles.cleanSection}>
-            <h4>Profile</h4>
-            <p>{form.summary}</p>
+          <div className={styles.sidebarBlock}>
+            <h4>EDUCATION</h4>
+            <ul>
+              {form.education.map((edu, idx) => (
+                <li key={idx}>
+                  <div className={styles.bold}>{edu.school}</div>
+                  <div>{edu.degree}</div>
+                  <div>{edu.dates}</div>
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className={styles.cleanSection}>
-            <h4>Experience</h4>
-            {form.experiences.map((exp, idx) => (
-              <div key={idx} className={styles.cleanItem}>
-                <div className={styles.cleanItemTitle}>
-                  {exp.role} — {exp.company}
-                </div>
-                <div className={styles.cleanItemMeta}>{exp.dates}</div>
-                <ul>
-                  {exp.bullets.map((b, i) => (
-                    <li key={i}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className={styles.cleanSection}>
-            <h4>Skills</h4>
+          <div className={styles.sidebarBlock}>
+            <h4>SKILLS</h4>
             <ul>
               {form.skills.map((skill, idx) => (
                 <li key={idx} className={styles.skillRow}>
@@ -569,18 +563,8 @@ export default function ResumeBuilder() {
               ))}
             </ul>
           </div>
-          <div className={styles.cleanSection}>
-            <h4>Education</h4>
-            {form.education.map((edu, idx) => (
-              <div key={idx} className={styles.cleanItem}>
-                <div className={styles.cleanItemTitle}>{edu.school}</div>
-                <div>{edu.degree}</div>
-                <div className={styles.cleanItemMeta}>{edu.dates}</div>
-              </div>
-            ))}
-          </div>
-          <div className={styles.cleanSection}>
-            <h4>Languages</h4>
+          <div className={styles.sidebarBlock}>
+            <h4>LANGUAGES</h4>
             <ul>
               {form.languages.map((lang, idx) => (
                 <li key={idx}>{lang}</li>
@@ -588,87 +572,200 @@ export default function ResumeBuilder() {
             </ul>
           </div>
         </div>
-      </div>
-    </div>
-  );
 
-  const renderSlateTemplate = () => (
-    <div ref={previewRef} className={styles.slateWrapper}>
-      <div className={styles.slateHeader}>
-        {form.photo && (
+        <div className={styles.navyMain}>
+          <div className={styles.navyHeaderText}>
+            <div className={styles.resumeName}>{form.name}</div>
+            <div className={styles.resumeTitle}>{form.title}</div>
+          </div>
+
+          <div className={styles.divider} />
+
+          <div className={styles.resumeSection}>
+            <h4>PROFILE</h4>
+            <div className={styles.resumeList} style={{ listStyle: "none", paddingLeft: 0 }}>
+              <div>{form.summary}</div>
+            </div>
+          </div>
+
+          <div className={styles.resumeSection}>
+            <h4>WORK EXPERIENCE</h4>
+            <ul className={styles.resumeList}>
+              {form.experiences.map((exp, idx) => (
+                <li key={idx}>
+                  <div className={styles.resumeItemTitle}>{exp.company}</div>
+                  <div className={styles.resumeTitleSmall}>{exp.role}</div>
+                  <div className={styles.resumeMeta}>{exp.dates}</div>
+                  <ul className={styles.resumeList}>
+                    {exp.bullets.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCleanTemplate = () => {
+    const photoSrc = resolvePhotoSrc(form.photo);
+    return (
+      <div ref={previewRef} className={styles.cleanWrapper}>
+        <div className={styles.cleanHeader}>
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+              <div>
+                <div className={styles.cleanName}>{form.name}</div>
+                <div className={styles.cleanTitle}>{form.title}</div>
+              </div>
+          </div>
+          <div className={styles.cleanMeta}>
+            <span>✉ {form.email}</span>
+            <span>☎ {form.phone}</span>
+            <span>📍 {form.location}</span>
+          </div>
+        </div>
+
+        <div className={styles.cleanDivider} />
+        <div className={styles.cleanGrid}>
+          <div>
+            <div className={styles.cleanSection}>
+              <h4>Profile</h4>
+              <p>{form.summary}</p>
+            </div>
+            <div className={styles.cleanSection}>
+              <h4>Experience</h4>
+              {form.experiences.map((exp, idx) => (
+                <div key={idx} className={styles.cleanItem}>
+                  <div className={styles.cleanItemTitle}>
+                    {exp.role} — {exp.company}
+                  </div>
+                  <div className={styles.cleanItemMeta}>{exp.dates}</div>
+                  <ul>
+                    {exp.bullets.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className={styles.cleanSection}>
+              <h4>Skills</h4>
+              <ul>
+                {form.skills.map((skill, idx) => (
+                  <li key={idx} className={styles.skillRow}>
+                    <span className={styles.skillName}>{skill.name}</span>
+                    <span className={styles.skillStars}>{renderStars(skill.rating)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={styles.cleanSection}>
+              <h4>Education</h4>
+              {form.education.map((edu, idx) => (
+                <div key={idx} className={styles.cleanItem}>
+                  <div className={styles.cleanItemTitle}>{edu.school}</div>
+                  <div>{edu.degree}</div>
+                  <div className={styles.cleanItemMeta}>{edu.dates}</div>
+                </div>
+              ))}
+            </div>
+            <div className={styles.cleanSection}>
+              <h4>Languages</h4>
+              <ul>
+                {form.languages.map((lang, idx) => (
+                  <li key={idx}>{lang}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSlateTemplate = () => {
+    const photoSrc = resolvePhotoSrc(form.photo);
+    return (
+      <div ref={previewRef} className={styles.slateWrapper}>
+        <div className={styles.slateHeader}>
           <div className={styles.slatePhoto}>
-            <Image src={form.photo} alt="Profile" width={90} height={90} />
+            <Image src={photoSrc} alt="Profile" width={90} height={90} />
           </div>
-        )}
-        <div>
-          <div className={styles.slateName}>{form.name}</div>
-          <div className={styles.slateTitle}>{form.title}</div>
-          <div className={styles.slateMeta}>
-            {form.email} • {form.phone} • {form.location}
+          <div>
+            <div className={styles.slateName}>{form.name}</div>
+            <div className={styles.slateTitle}>{form.title}</div>
+            <div className={styles.slateMeta}>
+              {form.email} • {form.phone} • {form.location}
+            </div>
           </div>
         </div>
-      </div>
-      <div className={styles.slateDivider} />
-      <div className={styles.slateSection}>
-        <h4>Summary</h4>
-        <p>{form.summary}</p>
-      </div>
-      <div className={styles.slateTwoCol}>
-        <div>
-          <div className={styles.slateSection}>
-            <h4>Experience</h4>
-            {form.experiences.map((exp, idx) => (
-              <div key={idx} className={styles.slateItem}>
-                <div className={styles.slateItemTitle}>{exp.role}</div>
-                <div className={styles.slateItemMeta}>
-                  {exp.company} • {exp.dates}
+        <div className={styles.slateDivider} />
+        <div className={styles.slateSection}>
+          <h4>Summary</h4>
+          <p>{form.summary}</p>
+        </div>
+        <div className={styles.slateTwoCol}>
+          <div>
+            <div className={styles.slateSection}>
+              <h4>Experience</h4>
+              {form.experiences.map((exp, idx) => (
+                <div key={idx} className={styles.slateItem}>
+                  <div className={styles.slateItemTitle}>{exp.role}</div>
+                  <div className={styles.slateItemMeta}>
+                    {exp.company} • {exp.dates}
+                  </div>
+                  <ul>
+                    {exp.bullets.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ul>
                 </div>
-                <ul>
-                  {exp.bullets.map((b, i) => (
-                    <li key={i}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className={styles.slateSection}>
-            <h4>Skills</h4>
-            <ul>
-              {form.skills.map((skill, idx) => (
-                <li key={idx} className={styles.skillRow}>
-                  <span className={styles.skillName}>{skill.name}</span>
-                  <span className={styles.skillStars}>{renderStars(skill.rating)}</span>
-                </li>
               ))}
-            </ul>
+            </div>
           </div>
-          <div className={styles.slateSection}>
-            <h4>Education</h4>
-            {form.education.map((edu, idx) => (
-              <div key={idx} className={styles.slateItem}>
-                <div className={styles.slateItemTitle}>{edu.school}</div>
-                <div className={styles.slateItemMeta}>{edu.degree}</div>
-                <div className={styles.slateItemMeta}>{edu.dates}</div>
-              </div>
-            ))}
-          </div>
-          <div className={styles.slateSection}>
-            <h4>Languages</h4>
-            <ul>
-              {form.languages.map((lang, idx) => (
-                <li key={idx}>{lang}</li>
+          <div>
+            <div className={styles.slateSection}>
+              <h4>Skills</h4>
+              <ul>
+                {form.skills.map((skill, idx) => (
+                  <li key={idx} className={styles.skillRow}>
+                    <span className={styles.skillName}>{skill.name}</span>
+                    <span className={styles.skillStars}>{renderStars(skill.rating)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={styles.slateSection}>
+              <h4>Education</h4>
+              {form.education.map((edu, idx) => (
+                <div key={idx} className={styles.slateItem}>
+                  <div className={styles.slateItemTitle}>{edu.school}</div>
+                  <div className={styles.slateItemMeta}>{edu.degree}</div>
+                  <div className={styles.slateItemMeta}>{edu.dates}</div>
+                </div>
               ))}
-            </ul>
+            </div>
+            <div className={styles.slateSection}>
+              <h4>Languages</h4>
+              <ul>
+                {form.languages.map((lang, idx) => (
+                  <li key={idx}>{lang}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  return (
-    <Layout>
+    return (
+      <Layout>
       <>
         <div className={`${styles.header} ${styles.noPrint}`}>
           <div>
@@ -710,7 +807,7 @@ export default function ResumeBuilder() {
           <div className={`${styles.card} ${styles.noPrint}`}>
             {activeTab === "upload" && (
               <>
-                <div className={styles.uploadCard}>
+                <form className={styles.uploadCard} onSubmit={handleUploadSubmit}>
                   <div className={styles.formHeader}>
                     <h3 className={styles.sectionTitle}>Upload your CV</h3>
                   </div>
@@ -718,56 +815,73 @@ export default function ResumeBuilder() {
                     Upload a PDF or DOCX. We will extract the text before sending it to AI.
                   </p>
                   <div className="form-group">
-                    <label  htmlFor="target-job">
-                      Target Job
-                    </label>
+                    <label htmlFor="target-job">Target Role *</label>
                     <input
                       id="target-job"
                       type="text"
                       className="form-control"
                       value={targetJob}
-                      onChange={(e) => setTargetJob(e.target.value)}
+                      onChange={(e) => {
+                        setTargetJob(e.target.value);
+                      }}
                       placeholder="e.g. Primary English Teacher"
+                      required
                     />
                   </div>
                   <div className="form-group">
-                    <label  htmlFor="job-description">
-                      Job Description
-                    </label>
+                    <label htmlFor="job-description">Job Description *</label>
                     <textarea
                       id="job-description"
                       className="form-control"
                       value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
+                      onChange={(e) => {
+                        setJobDescription(e.target.value);
+                      }}
                       placeholder="Paste the job description here..."
+                      required
                     />
                   </div>
-                  <div className={styles.uploadRow}>
-                    <label className={styles.fileButton}>
-                      📄 Upload your resume here
-                      <input
-                        type="file"
-                        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        className={styles.fileInputHidden}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setUploadFileName(file.name);
-                            handleFileUpload(file);
-                          }
-                        }}
-                      />
-                    </label>
-                    <span className={styles.fileName}>
-                      {uploadFileName || "No file selected"}
-                    </span>
+                  <div className="form-group">
+                    <div className={styles.uploadRow}>
+                        <label className={styles.fileButton}>
+                          📄 Upload your resume here
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            className={styles.fileInputHidden}
+                            required
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setUploadFileName(file.name);
+                                handleFileUpload(file);
+                              }
+                            }}
+                          />
+                        </label>
+                        <span className={styles.fileName}>
+                          {uploadFileName || "No file selected"}
+                        </span>
+                      </div>
+                      {isExtracting && <p className={styles.uploadStatus}>Extracting text...</p>}
+                      {uploadError && <p className={styles.uploadError}>{uploadError}</p>}
+                    </div>
+                  <div className="form-group">
+                    <button
+                      type="submit"
+                      className="btn-primary"
+                        disabled={isExtracting || isAnalyzing}
+                      aria-busy={isAnalyzing}
+                    >
+                      {isAnalyzing ? "Submitting..." : "Submit"}
+                    </button>
                   </div>
-                  {isExtracting && <p className={styles.uploadStatus}>Extracting text...</p>}
-                  {uploadError && <p className={styles.uploadError}>{uploadError}</p>}
-                </div>
+
+                </form>
+
 
                 {aiResult && (
-                  <div className={styles.aiCard}>
+                  <div ref={aiResultRef} className={styles.aiCard}>
                     <div className={styles.aiHeader}>
                       <h3 className={styles.sectionTitle}>✨ AI Resume Review</h3>
                       <span className={styles.aiScore}>⭐ {aiResult.score}/100</span>
@@ -778,7 +892,7 @@ export default function ResumeBuilder() {
                         <h4>✅ Strengths</h4>
                         <ul>
                           {aiResult.strengths.map((item, idx) => (
-                            <li key={idx}>{item}</li>
+                            <li key={idx}>{renderAiItem(item)}</li>
                           ))}
                         </ul>
                       </div>
@@ -788,7 +902,7 @@ export default function ResumeBuilder() {
                         <h4>🛠️ Improvements</h4>
                         <ul>
                           {aiResult.improvements.map((item, idx) => (
-                            <li key={idx}>{item}</li>
+                            <li key={idx}>{renderAiItem(item)}</li>
                           ))}
                         </ul>
                       </div>
@@ -798,7 +912,7 @@ export default function ResumeBuilder() {
                         <h4>💡 Suggestions</h4>
                         <ul>
                           {aiResult.suggestions.map((item, idx) => (
-                            <li key={idx}>{item}</li>
+                            <li key={idx}>{renderAiItem(item)}</li>
                           ))}
                         </ul>
                       </div>
@@ -815,7 +929,7 @@ export default function ResumeBuilder() {
                         <div className={styles.keywordList}>
                           {aiResult.keywords.map((item, idx) => (
                             <span key={idx} className={styles.keywordTag}>
-                              {item}
+                              {renderAiItem(item)}
                             </span>
                           ))}
                         </div>
@@ -893,7 +1007,7 @@ export default function ResumeBuilder() {
                         <label >Photo URL (optional)</label>
                         <input
                           className="form-control"
-                          value={form.photo || ""}
+                          value={typeof form.photo === "string" ? form.photo : ""}
                           placeholder="https://example.com/photo.jpg"
                           onChange={(e) => updateField("photo", e.target.value)}
                         />
@@ -1135,27 +1249,88 @@ export default function ResumeBuilder() {
             <div className={styles.previewHeader}>
               <h3 className={styles.sectionTitle}>Preview</h3>
               <div className={styles.previewActions}>
-                <div className={styles.templateOptions}>
-                  {[
-                    { id: "navy", label: "🎓 Educator Classic" },
-                    { id: "clean", label: "📄 Minimal White" },
-                    { id: "slate", label: "🧊 Modern Slate" },
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`${styles.templateOption} ${previewTemplate === option.id ? styles.templateOptionActive : ""
-                        }`}
-                      onClick={() =>
-                        setPreviewTemplate(option.id as "navy" | "clean" | "slate")
-                      }
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setIsTemplateModalOpen(true)}
+                >
+                  Choose Template
+                </button>
               </div>
             </div>
+            <div className={styles.selectedTemplateInfo}>
+              <span className={styles.selectedTemplateLabel}>Selected Template</span>
+              <span className={styles.selectedTemplateValue}>
+                {templateOptions.find((option) => option.id === previewTemplate)?.label ??
+                  "Classic"}
+              </span>
+            </div>
+
+            {isTemplateModalOpen && (
+              <div
+                className={styles.templateModalBackdrop}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Choose a template"
+                onClick={() => setIsTemplateModalOpen(false)}
+              >
+                <div
+                  className={styles.templateModal}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className={styles.templateModalHeader}>
+                    <div>
+                      <h4 className={styles.templateModalTitle}>Choose a Template</h4>
+                      <p className={styles.templateModalSubtitle}>
+                        Pick a classic, minimal, or modern layout for your resume preview.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.templateModalClose}
+                      onClick={() => setIsTemplateModalOpen(false)}
+                      aria-label="Close template chooser"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className={styles.templateModalGrid}>
+                    {templateOptions.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`${styles.templateCard} ${previewTemplate === option.id
+                          ? styles.templateCardActive
+                          : ""
+                          }`}
+                        onClick={() => {
+                          setPreviewTemplate(option.id);
+                          setIsTemplateModalOpen(false);
+                        }}
+                      >
+                        <div className={styles.templateThumb} aria-hidden="true">
+                          <Image
+                            src={option.image}
+                            alt={`${option.label} template preview`}
+                            className={styles.templateThumbImage}
+                          />
+                        </div>
+                        <div className={styles.templateCardText}>
+                          <div className={styles.templateCardTitle}>{option.label}</div>
+                          <div className={styles.templateCardSubtitle}>
+                            {option.description}
+                          </div>
+                        </div>
+                        {previewTemplate === option.id && (
+                          <span className={styles.templateCardBadge}>Selected</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {previewTemplate === "navy"
               ? renderNavyTemplate()

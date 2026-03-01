@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import Layout from "@/components/Layout/Layout";
 import styles from "./JobDetails.module.css";
+import { useLoader } from "@/components/Loader/LoaderProvider";
 
 type JobDetails = {
   id: string;
@@ -343,6 +344,7 @@ export default function JobDetailsPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const aiSectionRef = useRef<HTMLDivElement | null>(null);
+  const { withLoader } = useLoader();
 
   useEffect(() => {
     if (!router.isReady || !jobId) return;
@@ -372,7 +374,7 @@ export default function JobDetailsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const rawProfile = window.localStorage.getItem("userJobPrefix");
+      const rawProfile = window.localStorage.getItem("upeducateJobPrefix");
       if (!rawProfile) return;
       const parsed = JSON.parse(rawProfile) as Record<string, unknown>;
       const extracted = extractProfileData(parsed);
@@ -393,8 +395,9 @@ export default function JobDetailsPage() {
     if (!job?.description) return;
     if (!profileSkills && !profileSummary) return;
     if (aiLoading) return;
-      const jobExcerpt = getFirstWords(job.description, 100);
-      const summaryExcerpt = getFirstWords(profileSummary, 100);
+    const jobExcerpt = getFirstWords(job.description, 100);
+    const summaryExcerpt = getFirstWords(profileSummary, 100);
+    await withLoader(async () => {
       try {
         setAiLoading(true);
         setAiError(null);
@@ -440,6 +443,7 @@ export default function JobDetailsPage() {
       } finally {
         setAiLoading(false);
       }
+    }, "Analyzing job relevance...");
   };
 
   return (

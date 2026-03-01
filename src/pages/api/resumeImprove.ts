@@ -25,7 +25,11 @@ type AiResumeResult = {
   };
 };
 
-const buildPrompt = (text: string) => {
+const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: string) => {
+  const targetLine = targetJob ? `Target job: ${targetJob}` : "Target job: Not provided";
+  const jobDescLine = jobDescription
+    ? `Job description:\n${jobDescription}`
+    : "Job description: Not provided";
   return [
     "You are an expert resume coach.",
     "Analyze the resume text and provide improvement feedback.",
@@ -53,8 +57,11 @@ const buildPrompt = (text: string) => {
     "projects": [{"name":"","dates":"","summary":"","tech":""}]
   }
 }`,
-    "Resume text:",
-    text.slice(0, 6000),
+    "User resume:",
+    userResume.slice(0, 6000),
+    "",
+    targetLine,
+    jobDescLine,
   ].join("\n");
 };
 
@@ -72,13 +79,17 @@ export default async function handler(
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
-  if (!text || text.replace(/\s/g, "").length < 50) {
+  const userResume = typeof req.body?.userResume === "string" ? req.body.userResume.trim() : "";
+  const targetJob =
+    typeof req.body?.targetJob === "string" ? req.body.targetJob.trim() : "";
+  const jobDescription =
+    typeof req.body?.jobDescription === "string" ? req.body.jobDescription.trim() : "";
+  if (!userResume || userResume.replace(/\s/g, "").length < 50) {
     return res.status(400).json({ message: "Resume text is required." });
   }
 
   try {
-    const prompt = buildPrompt(text);
+    const prompt = buildPrompt(userResume, targetJob, jobDescription);
     const result = await createChatCompletion(prompt);
     const parsed = parseJson(result.content);
     return res.status(200).json(parsed);
@@ -95,3 +106,5 @@ export default async function handler(
     return res.status(500).json({ message });
   }
 }
+
+

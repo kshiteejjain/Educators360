@@ -66,7 +66,7 @@ export default function Login() {
               subject: authenticatedUser?.subject,
               userId: authenticatedUser?.userId,
             };
-            window.localStorage.setItem("userJobPrefix", JSON.stringify(payload));
+            window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(payload));
           } catch (err) {
             console.warn("Failed to store user job profile", err);
           }

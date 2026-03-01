@@ -19,9 +19,9 @@
 }
 
 .grid {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 20px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .card {
@@ -33,6 +33,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 32%;
 }
 
 .cardTitle {
@@ -99,6 +100,7 @@
   letter-spacing: 0.08em;
   color: #64748b;
   margin-bottom: 8px;
+  font-weight: 700;
 }
 
 .questionText {
@@ -110,6 +112,27 @@
 .questionWhy {
   margin: 0 0 12px;
   color: #475569;
+}
+
+.richHeading {
+  font-weight: 700;
+  color: #0f172a;
+  margin: 6px 0;
+}
+
+.richParagraph {
+  margin: 0 0 6px;
+  color: inherit;
+}
+
+.richList {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  color: inherit;
+}
+
+.richListItem {
+  margin: 0 0 4px;
 }
 
 .answerInput {
@@ -136,13 +159,13 @@
 
 .reportBody {
   padding: 24px;
-  border-radius: 16px;
-  background: linear-gradient(120deg, #f8fafc 0%, #eef2ff 100%);
+  border-radius: 20px;
+  background: linear-gradient(160deg, #f8fafc 0%, #eef2ff 60%, #e0f2fe 100%);
   border: 1px solid #e2e8f0;
   color: #0f172a;
   line-height: 1.7;
   font-size: 15px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
 }
 
 .scoreRow {
@@ -229,6 +252,74 @@
 
 .reportSpacer {
   height: 10px;
+}
+
+.reportLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.reportHero {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.reportGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.reportCard {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+.reportCardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.reportTag {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.reportCardTitle {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.reportList {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.reportListItem {
+  margin: 0 0 6px;
+  color: #0f172a;
+}
+
+.scoreGrid {
+  display: grid;
+  gap: 12px;
 }
 
 .error {

@@ -5,7 +5,7 @@ export type AuthUser = {
   userId?: string;
 };
 
-const STORAGE_KEY = "rwPrefix";
+const STORAGE_KEY = "upeducateJobPrefix";
 
 function isBrowser() {
   return typeof window !== "undefined";

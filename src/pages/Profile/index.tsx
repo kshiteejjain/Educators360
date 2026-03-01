@@ -16,7 +16,7 @@ export default function Profile() {
   const storedProfile = useMemo(() => {
     if (typeof window === "undefined") return null;
     try {
-      const raw = window.localStorage.getItem("userJobPrefix");
+      const raw = window.localStorage.getItem("upeducateJobPrefix");
       if (!raw) return null;
       return JSON.parse(raw) as Record<string, unknown>;
     } catch (error) {
