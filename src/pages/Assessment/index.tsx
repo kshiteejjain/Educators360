@@ -1,8 +1,19 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@/components/Layout/Layout";
 import { useLoader } from "@/components/Loader/LoaderProvider";
 import styles from "./Assessment.module.css";
 import assessmentCards from "@/utils/assessmentCards.json";
+import {
+  BarController,
+  BarElement,
+  CategoryScale,
+  Chart,
+  LinearScale,
+  Tooltip,
+  Legend,
+  type ChartConfiguration,
+  type ChartData,
+} from "chart.js";
 
 type AssessmentCard = {
   id: string;
@@ -32,13 +43,15 @@ const STORAGE_PREFIX = "assessment:questions:";
 const REPORT_PREFIX = "assessment:report:";
 const JOB_PREFIX_KEY = "upeducateJobPrefix";
 
+Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+
 const normalizeLine = (line: string) => line.replace(/\s+/g, " ").trim();
 
 const parseQuestions = (content: string): ParsedQuestion[] => {
   const lines = content
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter((line) => line.length > 0 && !/^-{3,}$/.test(line));
 
   const items: ParsedQuestion[] = [];
   let current: { question: string; why: string } | null = null;
@@ -218,23 +231,81 @@ const renderRichText = (value: string) => {
   return blocks;
 };
 
-const renderScoreRow = (label: string, score: number, note?: string) => {
-  const safeScore = Math.max(0, Math.min(10, score));
-  const filled = Math.round(safeScore / 2);
-  const stars = Array.from({ length: 5 }, (_, idx) => (idx < filled ? "★" : "☆"));
+type ScorecardChartProps = {
+  labels: string[];
+  values: number[];
+};
+
+const ScorecardChart = ({ labels, values }: ScorecardChartProps) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const chartRef = useRef<Chart<"bar"> | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (chartRef.current) chartRef.current.destroy();
+
+    const data: ChartData<"bar"> = {
+      labels,
+      datasets: [
+        {
+          label: "Score",
+          data: values,
+          backgroundColor: ["#6366f1"],
+          hoverBackgroundColor: ["#4f46e5"],
+          borderRadius: 10,
+          borderSkipped: false,
+          barThickness: 36,
+        },
+      ],
+    };
+
+    const config: ChartConfiguration<"bar"> = {
+      type: "bar",
+      data,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: "x",
+        scales: {
+          x: {
+            type: "category",
+            ticks: {
+              color: "#0f172a",
+              maxRotation: 0,
+              minRotation: 0,
+            },
+            grid: {
+              display: false,
+            },
+          },
+          y: {
+            type: "linear",
+            position: "left",
+            min: 0,
+            max: 10,
+            ticks: {
+              stepSize: 1,
+              color: "#64748b",
+            },
+            grid: {
+              color: "rgba(148, 163, 184, 0.2)",
+            },
+          },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true },
+        },
+      },
+    };
+
+    chartRef.current = new Chart(canvasRef.current, config);
+    return () => chartRef.current?.destroy();
+  }, [labels.join("|"), values.join("|")]);
+
   return (
-    <div className={styles.scoreRow} key={`score-${label}`}>
-      <div className={styles.scoreHeader}>
-        <div className={styles.scoreLabel}>{renderInline(label)}</div>
-        <div className={styles.scoreValue}>{safeScore}/10</div>
-      </div>
-      <div className={styles.scoreBar}>
-        <div className={styles.scoreFill} style={{ width: `${safeScore * 10}%` }} />
-      </div>
-      <div className={styles.scoreStars} aria-hidden="true">
-        {stars.join(" ")}
-      </div>
-      {note ? <p className={styles.scoreNote}>{renderInline(note)}</p> : null}
+    <div className={styles.scoreChartWrapper}>
+      <canvas ref={canvasRef} className={styles.scoreChartCanvas} />
     </div>
   );
 };
@@ -244,11 +315,38 @@ type ReportSection = {
   lines: string[];
 };
 
+const extractScoreLines = (lines: string[]) =>
+  lines
+    .map((line) => line.replace(/^[-•–—▸]\s*/, ""))
+    .map((line) => {
+      const normalized = line.trim();
+      if (/^#+\s+/.test(normalized)) return null;
+      if (/^\|?\s*competency\s*\|\s*score\s*\|?/i.test(normalized)) {
+        return null;
+      }
+      if (/^\|?\s*[-:]+\s*\|\s*[-:]+\s*\|?\s*$/.test(normalized)) {
+        return null;
+      }
+      const cleaned = normalized.replace(/\*\*/g, "");
+      const tableMatch = cleaned.match(
+        /^\|?\s*([^|]+?)\s*\|\s*(\d{1,2})\s*\|?\s*$/
+      );
+      if (tableMatch) {
+        return { label: tableMatch[1].trim(), score: Number(tableMatch[2]) };
+      }
+      const match = cleaned.match(/^(.+?)\s*:\s*(\d{1,2})\s*$/);
+      if (!match) return null;
+      return { label: match[1].trim(), score: Number(match[2]) };
+    })
+    .filter(Boolean) as Array<{ label: string; score: number }>;
+
 const parseReportSections = (text: string) => {
   const lines = text.split(/\r?\n/).map((line) => line.trim());
   let title = "";
   const sections: ReportSection[] = [];
   let current: ReportSection | null = null;
+  const stripHeadingPrefix = (value: string) =>
+    value.replace(/^#+\s*/, "").replace(/^\d+\.\s+/, "").trim();
 
   const flush = () => {
     if (!current) return;
@@ -261,16 +359,23 @@ const parseReportSections = (text: string) => {
 
   for (const line of lines) {
     if (!line) continue;
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    const numberedMatch = line.match(/^\d+\.\s+(.+)$/);
+    const conclusionMatch = line.match(/^conclusion$/i);
     if (!title) {
-      title = line.replace(/^#+\s*/, "");
+      if (headingMatch) {
+        title = stripHeadingPrefix(headingMatch[2]);
+      } else {
+        title = stripHeadingPrefix(line);
+      }
       continue;
     }
-    const headingMatch = line.match(/^\d+\.\s+(.+)$/);
-    const conclusionMatch = line.match(/^conclusion$/i);
-    if (headingMatch || conclusionMatch) {
+    if (headingMatch || numberedMatch || conclusionMatch) {
       flush();
       current = {
-        title: headingMatch ? headingMatch[1].trim() : "Conclusion",
+        title: conclusionMatch
+          ? "Conclusion"
+          : stripHeadingPrefix(headingMatch ? headingMatch[2] : numberedMatch?.[1] || line),
         lines: [],
       };
       continue;
@@ -285,6 +390,18 @@ const parseReportSections = (text: string) => {
   return { title, sections };
 };
 
+const getSectionIcon = (title: string) => {
+  const key = title.toLowerCase();
+  if (key.includes("identity") || key.includes("persona")) return "🧭";
+  if (key.includes("scorecard")) return "📊";
+  if (key.includes("strength") || key.includes("superpower")) return "💪";
+  if (key.includes("growth") || key.includes("gap")) return "🧩";
+  if (key.includes("strategy")) return "🗺️";
+  if (key.includes("action") || key.includes("roadmap")) return "🛠️";
+  if (key.includes("conclusion")) return "✅";
+  return "📝";
+};
+
 const renderReport = (text: string) => {
   const parsed = parseReportSections(text);
   if (!parsed.sections.length) return null;
@@ -292,34 +409,60 @@ const renderReport = (text: string) => {
   return (
     <div className={styles.reportLayout}>
       <div className={styles.reportHero}>
-        <h2 className={styles.reportH2}>{renderInline(parsed.title || "Report")}</h2>
-        <p className={styles.reportParagraph}>
-          A structured snapshot of strengths, growth areas, and next steps.
-        </p>
+        <div className={styles.reportHeroHeader}>
+          <span className={styles.reportHeroIcon} aria-hidden="true">
+            📘
+          </span>
+          <div>
+            <h2 className={styles.reportH2}>{renderInline(parsed.title || "Report")}</h2>
+            <p className={styles.reportParagraph}>
+              A structured snapshot of strengths, growth areas, and next steps.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className={styles.reportGrid}>
         {parsed.sections.map((section, index) => {
-          const isScorecard = section.title.toLowerCase().includes("scorecard");
+          const scoreLines = extractScoreLines(section.lines);
+          const isScorecard =
+            section.title.toLowerCase().includes("scorecard") || scoreLines.length > 0;
           if (isScorecard) {
-            const scoreLines = section.lines
-              .map((line) => line.replace(/^[-•]\s*/, ""))
-              .map((line) => {
-                const match = line.match(/^(.+?)\s*:\s*(\d{1,2})\s*$/);
-                if (!match) return null;
-                return { label: match[1].trim(), score: Number(match[2]) };
-              })
-              .filter(Boolean) as Array<{ label: string; score: number }>;
+            const labels = scoreLines.map((item) => item.label);
+            const values = scoreLines.map((item) => item.score);
+            const scorecardBullets = section.lines.filter((line) => /^[-•]\s+/.test(line));
+            const scorecardParagraphs = section.lines.filter((line) => !/^[-•]\s+/.test(line));
 
             return (
               <div key={`section-${index}`} className={styles.reportCard}>
                 <div className={styles.reportCardHeader}>
-                  <span className={styles.reportTag}>Scorecard</span>
+                  <span className={styles.reportTag}>
+                    <span aria-hidden="true">📊</span> Scorecard
+                  </span>
                   <h3 className={styles.reportCardTitle}>{renderInline(section.title)}</h3>
                 </div>
-                <div className={styles.scoreGrid}>
-                  {scoreLines.map((item) => renderScoreRow(item.label, item.score))}
-                </div>
+                {scoreLines.length > 0 ? (
+                  <ScorecardChart labels={labels} values={values} />
+                ) : (
+                  <p className={styles.reportParagraph}>No score data available.</p>
+                )}
+                {scorecardParagraphs.map((line, pIndex) => (
+                  <p key={`p-score-${index}-${pIndex}`} className={styles.reportParagraph}>
+                    {renderInline(line.replace(/^[-•]\s*/, ""))}
+                  </p>
+                ))}
+                {scorecardBullets.length > 0 && (
+                  <ul className={styles.reportList}>
+                    {scorecardBullets.map((line, bIndex) => (
+                      <li key={`b-score-${index}-${bIndex}`} className={styles.reportListItem}>
+                        <span className={styles.reportBulletIcon} aria-hidden="true">
+                          ▸
+                        </span>
+                        {renderInline(line.replace(/^[-•]\s*/, ""))}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             );
           }
@@ -330,8 +473,16 @@ const renderReport = (text: string) => {
           return (
             <div key={`section-${index}`} className={styles.reportCard}>
               <div className={styles.reportCardHeader}>
-                <span className={styles.reportTag}>Section {index + 1}</span>
-                <h3 className={styles.reportCardTitle}>{renderInline(section.title)}</h3>
+                <span className={styles.reportTag}>
+                  <span aria-hidden="true">{getSectionIcon(section.title)}</span> Section{" "}
+                  {index + 1}
+                </span>
+                <h3 className={styles.reportCardTitle}>
+                  <span className={styles.reportTitleIcon} aria-hidden="true">
+                    {getSectionIcon(section.title)}
+                  </span>
+                  {renderInline(section.title)}
+                </h3>
               </div>
               {paragraphs.map((line, pIndex) => (
                 <p key={`p-${index}-${pIndex}`} className={styles.reportParagraph}>
@@ -342,6 +493,9 @@ const renderReport = (text: string) => {
                 <ul className={styles.reportList}>
                   {bullets.map((line, bIndex) => (
                     <li key={`b-${index}-${bIndex}`} className={styles.reportListItem}>
+                      <span className={styles.reportBulletIcon} aria-hidden="true">
+                        ▸
+                      </span>
                       {renderInline(line.replace(/^[-•]\s*/, ""))}
                     </li>
                   ))}
@@ -381,9 +535,10 @@ export default function Assessment() {
   }, [activeCardId, view]);
 
   const questions = useMemo(() => parseQuestions(result), [result]);
-  const allAnswered =
-    questions.length > 0 &&
-    questions.every((item) => (answers[item.id] || "").trim().length > 0);
+  const hasQuestions = questions.length > 0;
+  const hasAnyAnswer = questions.some(
+    (item) => (answers[item.id] || "").trim().length > 0
+  );
 
   const handleStart = async (cardId: string) => {
     setError("");
@@ -450,8 +605,8 @@ export default function Assessment() {
     event.preventDefault();
     if (!activeCardId) return;
 
-    if (!allAnswered) {
-      setError("Please answer every question before generating the report.");
+    if (!hasAnyAnswer) {
+      setError("All fields should not be empty.");
       return;
     }
 
@@ -538,8 +693,6 @@ export default function Assessment() {
               </button>
             </div>
 
-            {error && <div className={styles.error}>{error}</div>}
-
             <form className={styles.questionsList} onSubmit={handleSubmit}>
               {questions.map((item, index) => (
                 <div key={item.id} className={styles.questionCard}>
@@ -556,16 +709,18 @@ export default function Assessment() {
                     placeholder="Write your response here..."
                     value={answers[item.id] || ""}
                     onChange={(event) => handleAnswerChange(item.id, event.target.value)}
-                    required
                   />
                 </div>
               ))}
 
-              <div className={styles.submitRow}>
-                <button type="submit" className="btn-primary" disabled={!allAnswered}>
-                  Submit
-                </button>
-              </div>
+              {hasQuestions && (
+                <div className={styles.submitRow}>
+                  {error && <div className={styles.error}>{error}</div>}
+                  <button type="submit" className="btn-primary">
+                    Submit
+                  </button>
+                </div>
+              )}
             </form>
           </div>
         )}

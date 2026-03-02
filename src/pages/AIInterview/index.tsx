@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@/components/Layout/Layout";
 import styles from "./AIInterview.module.css";
 
@@ -6,8 +6,7 @@ type ViewMode = "configure" | "interact";
 
 export default function AIInterview() {
   const [view, setView] = useState<ViewMode>("configure");
-  const [coachName, setCoachName] = useState("Career");
-  const [contextPrompt, setContextPrompt] = useState("I am Math teacher");
+  const [contextPrompt, setContextPrompt] = useState("");
   const [isActive, setIsActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [status, setStatus] = useState<"idle" | "connecting" | "live" | "error">(
@@ -17,6 +16,8 @@ export default function AIInterview() {
   const [eventLog, setEventLog] = useState<string[]>([]);
   const [lastUserAudioAt, setLastUserAudioAt] = useState<number | null>(null);
   const [lastAiAudioAt, setLastAiAudioAt] = useState<number | null>(null);
+  const isUserSpeaking = Boolean(lastUserAudioAt && Date.now() - lastUserAudioAt < 1200);
+  const isAiSpeaking = Boolean(lastAiAudioAt && Date.now() - lastAiAudioAt < 1200);
   const socketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioInputRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -28,6 +29,10 @@ export default function AIInterview() {
   const userEndedRef = useRef(false);
   const lastUserAudioUiRef = useRef(0);
   const lastAiAudioUiRef = useRef(0);
+  const silenceStageRef = useRef(0);
+  const silenceDeadlineRef = useRef<number | null>(null);
+  const silenceIntervalRef = useRef<number | null>(null);
+  const staticCoachName = "AI Interview Assistant";
 
   useEffect(
     () => () => {
@@ -36,6 +41,10 @@ export default function AIInterview() {
       audioWorkletRef.current?.disconnect();
       audioInputRef.current?.disconnect();
       audioContextRef.current?.close();
+      if (silenceIntervalRef.current) {
+        window.clearInterval(silenceIntervalRef.current);
+        silenceIntervalRef.current = null;
+      }
     },
     []
   );
@@ -45,6 +54,53 @@ export default function AIInterview() {
     audioWorkletRef.current?.disconnect();
     audioInputRef.current?.disconnect();
     audioContextRef.current?.close();
+  };
+
+  const sendAgentText = (message: string) => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(
+      JSON.stringify({
+        type: "user_message",
+        text: message,
+      })
+    );
+    addLog(`Sent: ${message}`);
+  };
+
+  const handleSilenceTick = () => {
+    if (!isActive || status !== "live") return;
+    if (!lastAiAudioAt) return;
+    if (isAiSpeaking) return;
+
+    if (lastUserAudioAt && lastUserAudioAt > lastAiAudioAt) {
+      silenceStageRef.current = 0;
+      silenceDeadlineRef.current = null;
+      return;
+    }
+
+    if (!silenceDeadlineRef.current) {
+      silenceDeadlineRef.current = lastAiAudioAt + 8000;
+    }
+    if (Date.now() < silenceDeadlineRef.current) return;
+
+    if (silenceStageRef.current === 0) {
+      sendAgentText("Are you there?");
+      silenceStageRef.current = 1;
+      silenceDeadlineRef.current = Date.now() + 8000;
+      return;
+    }
+    if (silenceStageRef.current === 1) {
+      sendAgentText("Are you there?");
+      silenceStageRef.current = 2;
+      silenceDeadlineRef.current = Date.now() + 8000;
+      return;
+    }
+
+    sendAgentText(
+      "I think there might be some issues or we lost you during the interview. Thanks for your time. Ending the interview now."
+    );
+    endInterview();
   };
 
   const addLog = (message: string) => {
@@ -145,6 +201,8 @@ export default function AIInterview() {
       lastUserAudioUiRef.current = now;
       setLastUserAudioAt(now);
     }
+    silenceStageRef.current = 0;
+    silenceDeadlineRef.current = null;
   };
 
   const startMic = async (ws: WebSocket) => {
@@ -203,11 +261,16 @@ export default function AIInterview() {
             type: "conversation_initiation_client_data",
             conversation_config_override: configOverride,
             dynamic_variables: {
-              coach_name: coachName,
-              context_prompt: contextPrompt,
+              coach_name: staticCoachName,
+              context_prompt: contextPrompt || "Not provided",
             },
           })
         );
+        silenceStageRef.current = 0;
+        silenceDeadlineRef.current = null;
+        if (!silenceIntervalRef.current) {
+          silenceIntervalRef.current = window.setInterval(handleSilenceTick, 1000);
+        }
         await startMic(ws);
         addLog("Microphone streaming started.");
         setIsActive(true);
@@ -249,12 +312,14 @@ export default function AIInterview() {
               lastAiAudioUiRef.current = now;
               setLastAiAudioAt(now);
             }
+            silenceStageRef.current = 0;
+            silenceDeadlineRef.current = null;
           }
         } catch {
           // ignore malformed messages
         }
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setIsActive(false);
         if (userEndedRef.current) {
           setStatus("idle");
@@ -265,7 +330,9 @@ export default function AIInterview() {
           setErrorMessage(
             "Interview ended unexpectedly. Check mic permission and agent setup."
           );
-          addLog("WebSocket closed unexpectedly.");
+          addLog(
+            `WebSocket closed unexpectedly. Code=${event.code} Reason=${event.reason || "n/a"} Clean=${event.wasClean}`
+          );
         }
       };
       ws.onerror = () => {
@@ -291,6 +358,12 @@ export default function AIInterview() {
     } else {
       socketRef.current?.close();
     }
+    if (silenceIntervalRef.current) {
+      window.clearInterval(silenceIntervalRef.current);
+      silenceIntervalRef.current = null;
+    }
+    silenceStageRef.current = 0;
+    silenceDeadlineRef.current = null;
     setIsActive(false);
     setStatus("idle");
     stopAudio();
@@ -313,19 +386,6 @@ export default function AIInterview() {
             <form className={styles.card} onSubmit={handleSubmit}>
               <div>
                 <div className="form-group">
-                  <label htmlFor="coachName">
-                    Coach Name
-                  </label>
-                  <input
-                    id="coachName"
-                    className="form-control"
-                    value={coachName}
-                    onChange={(e) => setCoachName(e.target.value)}
-                    placeholder="Career"
-                  />
-                </div>
-
-                <div className="form-group">
                   <label htmlFor="contextPrompt">
                     Add Detailed Prompt for Interview Context (Example - Interviewer profile,
                     job description)
@@ -341,7 +401,7 @@ export default function AIInterview() {
               </div>
 
               <div className={styles.submitRow}>
-                <button type="submit" className={styles.submitButton}>
+                <button type="submit" className="btn-primary">
                   Submit
                 </button>
               </div>
@@ -352,7 +412,7 @@ export default function AIInterview() {
             <div className={styles.headerRow}>
               <div className={styles.interactionHeader}>
                 <h2 className={styles.interactionTitle}>AI Interaction</h2>
-                <div className={styles.subtitle}>AI Coach Assistant</div>
+                <div className={styles.subtitle}>AI Interview Assistant</div>
                 <div className={styles.interactionSub}>
                   Tip: If the AI agent doesn&apos;t appear within a few seconds, please
                   refresh the page.
@@ -377,9 +437,23 @@ export default function AIInterview() {
                         ? "Talk to interrupt"
                         : "Start Interview"}
                   </div>
-                  <div className={styles.coachLine}>
-                    Coach: <span>{coachName || "AI Coach"}</span>
+                  <div className={styles.speakingRow}>
+                    <div className={styles.speakingLabel}>User</div>
+                    <div className={`${styles.speakingWave} ${isUserSpeaking ? styles.speakingWaveActive : ""}`}>
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                    <div className={styles.speakingLabel}>AI</div>
+                    <div className={`${styles.speakingWave} ${isAiSpeaking ? styles.speakingWaveActive : ""}`}>
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                    </div>
                   </div>
+
                   <div className={styles.actions}>
                     {isActive ? (
                       <button
@@ -405,8 +479,9 @@ export default function AIInterview() {
                       onClick={() => setIsMuted((prev) => !prev)}
                       aria-pressed={isMuted}
                       title={isMuted ? "Unmute" : "Mute"}
+                      aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
                     >
-                      ðŸŽ¤
+                      {isMuted ? "\u{1F507}" : "\u{1F3A4}"}
                     </button>
                   </div>
                   <div className={styles.audioStatus}>
