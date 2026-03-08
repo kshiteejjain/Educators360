@@ -196,11 +196,6 @@
 .loadMoreRow button{
   width: auto;
 }
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  box-shadow: none;
-}
 
 @keyframes floatIn {
   from {

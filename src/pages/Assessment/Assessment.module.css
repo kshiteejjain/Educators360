@@ -9,7 +9,7 @@
 .title {
   font-size: 28px;
   margin: 0 0 8px;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .subtitle {
@@ -39,7 +39,7 @@
 .cardTitle {
   font-size: 20px;
   margin: 0;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .cardDescription {
@@ -63,7 +63,7 @@
 .questionsTitle {
   margin: 0;
   font-size: 22px;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .backButton {
@@ -105,7 +105,7 @@
 
 .questionText {
   font-size: 16px;
-  color: #0f172a;
+  color: var(--color-text);
   margin: 0 0 8px;
 }
 
@@ -116,7 +116,7 @@
 
 .richHeading {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text);
   margin: 6px 0;
 }
 
@@ -163,7 +163,7 @@
   border-radius: 20px;
   background: radial-gradient(circle at top left, #f8fafc 0%, #eef2ff 45%, #e0f2fe 100%);
   border: 1px solid #e2e8f0;
-  color: #0f172a;
+  color: var(--color-text);
   line-height: 1.7;
   font-size: 15px;
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
@@ -186,7 +186,7 @@
 .reportH2 {
   font-size: 22px;
   margin: 0 0 12px;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .reportH3 {
@@ -203,12 +203,12 @@
 
 .reportParagraph {
   margin: 0 0 10px;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .reportBullet {
   margin: 0 0 8px;
-  color: #0f172a;
+  color: var(--color-text);
   padding-left: 8px;
 }
 
@@ -286,7 +286,7 @@
   gap: 8px;
   margin: 0;
   font-size: 18px;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .reportTitleIcon {
@@ -303,7 +303,7 @@
   display: flex;
   gap: 8px;
   margin: 0 0 8px;
-  color: #0f172a;
+  color: var(--color-text);
   line-height: 1.5;
 }
 .reportList li strong{
@@ -339,7 +339,7 @@
 
 .resultTitle {
   margin: 0 0 12px;
-  color: #0f172a;
+  color: var(--color-text);
   font-size: 18px;
 }
 
@@ -347,5 +347,5 @@
   margin: 0;
   white-space: pre-wrap;
   font-family: "Courier New", Courier, monospace;
-  color: #0f172a;
+  color: var(--color-text);
 }

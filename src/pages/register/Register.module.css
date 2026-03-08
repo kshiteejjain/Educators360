@@ -44,6 +44,8 @@
   align-items: center;
   justify-content: center;
   animation: slideInRight 0.5s ease-out;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .formContainer {

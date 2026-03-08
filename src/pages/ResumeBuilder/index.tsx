@@ -150,6 +150,7 @@ export default function ResumeBuilder() {
   const [jobDescription, setJobDescription] = useState("");
   const [manualMode, setManualMode] = useState<"build" | "edit">("build");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { withLoader } = useLoader();
   const aiResultRef = useRef<HTMLDivElement>(null);
 
@@ -274,74 +275,88 @@ export default function ResumeBuilder() {
       toast.error("Please log in to save your resume.");
       return;
     }
+    if (isSaving) return;
 
+    setIsSaving(true);
     try {
-      const db = getDb();
-      const userRef = doc(db, "upEducatePlusUsers", session.email.toLowerCase());
-      const resumePayload = {
-        templateId: selectedTemplate.id,
-        templateName: selectedTemplate.title || "",
-        previewTemplate,
-        updatedAt: serverTimestamp(),
-        data: {
-          name: form.name,
-          title: form.title,
-          location: form.location,
-          email: form.email,
-          phone: form.phone,
-          photo: form.photo ?? "",
-          summary: form.summary,
-          skills: form.skills,
-          languages: form.languages,
-          experiences: form.experiences,
-          education: form.education,
-        },
-      };
+      await withLoader(async () => {
+        const db = getDb();
+        const userRef = doc(db, "upEducatePlusUsers", session.email.toLowerCase());
+        const resumePayload = {
+          templateId: selectedTemplate.id,
+          templateName: selectedTemplate.title || "",
+          previewTemplate,
+          updatedAt: serverTimestamp(),
+          data: {
+            name: form.name,
+            title: form.title,
+            location: form.location,
+            email: form.email,
+            phone: form.phone,
+            photo: form.photo ?? "",
+            summary: form.summary,
+            skills: form.skills,
+            languages: form.languages,
+            experiences: form.experiences,
+            education: form.education,
+          },
+        };
 
-      await setDoc(userRef, { resume: resumePayload }, { merge: true });
+        await setDoc(userRef, { resume: resumePayload }, { merge: true });
 
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf"),
-      ]);
+        if (typeof window !== "undefined") {
+          try {
+            const raw = window.localStorage.getItem("upeducateJobPrefix");
+            const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+            const next = { ...existing, resume: resumePayload };
+            window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(next));
+          } catch (error) {
+            console.warn("Failed to store resume in local storage", error);
+          }
+        }
 
-      if ("fonts" in document) {
-        await (document as Document & { fonts: FontFaceSet }).fonts.ready;
-      }
+        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+          import("html2canvas"),
+          import("jspdf"),
+        ]);
 
-      const target = previewRef.current;
-      if (!target) return;
+        if ("fonts" in document) {
+          await (document as Document & { fonts: FontFaceSet }).fonts.ready;
+        }
 
-      const canvas = await html2canvas(target, {
-        useCORS: true,
-        scale: 2,
-        backgroundColor: null,
-      });
+        const target = previewRef.current;
+        if (!target) return;
 
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "pt",
-        format: "a4",
-      });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const ratio = pageWidth / canvas.width;
-      const imgWidth = canvas.width * ratio;
-      const imgHeight = canvas.height * ratio;
-      const x = 0;
-      const y = 0;
-      pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+        const canvas = await html2canvas(target, {
+          useCORS: true,
+          scale: 2,
+          backgroundColor: null,
+        });
 
-      const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
-      const roleSlug = (form.title || selectedTemplate.title || "role")
-        .replace(/\s+/g, "-")
-        .toLowerCase();
-      pdf.save(`${nameSlug}-${roleSlug}.pdf`);
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "pt",
+          format: "a4",
+        });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const ratio = pageWidth / canvas.width;
+        const imgWidth = canvas.width * ratio;
+        const imgHeight = canvas.height * ratio;
+        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+
+        const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
+        const roleSlug = (form.title || selectedTemplate.title || "role")
+          .replace(/\s+/g, "-")
+          .toLowerCase();
+        pdf.save(`${nameSlug}-${roleSlug}.pdf`);
+      }, "Saving and downloading your resume...");
       toast.success("Resume saved and downloaded.");
     } catch (err) {
       console.error("Failed to save resume or generate PDF", err);
       toast.error("Could not save or download the resume. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -870,7 +885,12 @@ export default function ResumeBuilder() {
                     <button
                       type="submit"
                       className="btn-primary"
-                        disabled={isExtracting || isAnalyzing}
+                      disabled={
+                        isExtracting ||
+                        isAnalyzing ||
+                        !jobDescription.trim() ||
+                        !extractedText.trim()
+                      }
                       aria-busy={isAnalyzing}
                     >
                       {isAnalyzing ? "Submitting..." : "Submit"}
@@ -1343,8 +1363,10 @@ export default function ResumeBuilder() {
               className={`btn-primary ${styles.downloadResume}`}
               title="Save and Download PDF"
               onClick={saveDownloadResume}
+              disabled={isSaving}
+              aria-busy={isSaving}
             >
-              Save and Download
+              {isSaving ? "Saving..." : "Save and Download"}
             </button>
           </div>
         </div>
