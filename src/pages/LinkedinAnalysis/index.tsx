@@ -179,6 +179,17 @@ export default function LinkedinAnalysis() {
   }>({});
   const { withLoader } = useLoader();
 
+  const getAiModifications = () => {
+    const modifications = analysisResult?.aiAnalysis?.modifications;
+    if (!modifications) return null;
+    const hasContent =
+      Boolean(modifications.headline) ||
+      Boolean(modifications.about) ||
+      Boolean(modifications.experienceBullets?.length) ||
+      Boolean(modifications.skills?.length);
+    return hasContent ? modifications : null;
+  };
+
   useEffect(() => {
     const session = getSession();
     if (!session?.email) {
@@ -345,6 +356,8 @@ export default function LinkedinAnalysis() {
     await withLoader(analyzeProfile, "Analyzing your LinkedIn profile...");
   };
 
+  const aiModifications = getAiModifications();
+
   return (
     <Layout>
       <div className={styles.container}>
@@ -507,6 +520,53 @@ export default function LinkedinAnalysis() {
                 </div>
               ))}
             </div>
+
+            {aiModifications && (
+              <div className={styles.aiSection}>
+                <div className={styles.aiHeader}>
+                  <h2>AI Recommended Changes</h2>
+                </div>
+                <p className={styles.aiRationale}>
+                  Review the suggested upgrades below and copy the sections that fit your voice.
+                </p>
+                <div className={styles.aiCardGrid}>
+                  {aiModifications.headline ? (
+                    <div className={styles.summaryCard}>
+                      <div className={styles.summaryLabel}>Headline Rewrite</div>
+                      <p className={styles.cardText}>{aiModifications.headline}</p>
+                    </div>
+                  ) : null}
+                  {aiModifications.about ? (
+                    <div className={styles.summaryCard}>
+                      <div className={styles.summaryLabel}>About Section</div>
+                      <p className={styles.cardText}>{aiModifications.about}</p>
+                    </div>
+                  ) : null}
+                  {aiModifications.experienceBullets?.length ? (
+                    <div className={styles.summaryCard}>
+                      <div className={styles.summaryLabel}>Experience Bullet Upgrades</div>
+                      <ul className={styles.cardList}>
+                        {aiModifications.experienceBullets.map((bullet, idx) => (
+                          <li key={`exp-${idx}`}>{bullet}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {aiModifications.skills?.length ? (
+                    <div className={styles.summaryCard}>
+                      <div className={styles.summaryLabel}>Skill Additions</div>
+                      <div className={styles.cardTags}>
+                        {aiModifications.skills.map((skill, idx) => (
+                          <span key={`skill-${idx}`} className={styles.cardTag}>
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
 
             {analysisResult.aiAnalysis?.recommendations?.length ? (
               <div className={styles.actionSection}>

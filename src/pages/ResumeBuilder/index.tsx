@@ -147,18 +147,96 @@ export default function ResumeBuilder() {
   const [aiResult, setAiResult] = useState<AiResumeResult | null>(null);
   const [uploadFileName, setUploadFileName] = useState("");
   const [targetJob, setTargetJob] = useState("");
-  const [jobDescription, setJobDescription] = useState("");
   const [manualMode, setManualMode] = useState<"build" | "edit">("build");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { withLoader } = useLoader();
   const aiResultRef = useRef<HTMLDivElement>(null);
+  const hasHydratedResume = useRef(false);
 
   useEffect(() => {
     if (aiResult && aiResultRef.current) {
       aiResultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [aiResult]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || hasHydratedResume.current) return;
+    hasHydratedResume.current = true;
+    try {
+      const raw = window.localStorage.getItem("upeducateJobPrefix");
+      const cached = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      const resumeRecord = cached?.resume;
+      if (!resumeRecord || typeof resumeRecord !== "object") return;
+      const resumeData =
+        (resumeRecord as Record<string, unknown>)?.data &&
+        typeof (resumeRecord as Record<string, unknown>).data === "object"
+          ? ((resumeRecord as Record<string, unknown>).data as Record<string, unknown>)
+          : null;
+      if (!resumeData) return;
+
+      const normalizedSkills = Array.isArray(resumeData.skills)
+        ? (resumeData.skills as unknown[]).map((skill) =>
+            typeof skill === "string"
+              ? { name: skill, rating: 3 }
+              : {
+                  name: String((skill as Record<string, unknown>)?.name ?? ""),
+                  rating: Math.max(
+                    1,
+                    Math.min(5, Number((skill as Record<string, unknown>)?.rating ?? 3))
+                  ),
+                }
+          )
+        : [];
+
+      const nextForm: ResumeTemplate = {
+        ...emptyState(templates[0]),
+        name: String(resumeData.name ?? ""),
+        title: String(resumeData.title ?? ""),
+        location: String(resumeData.location ?? ""),
+        email: String(resumeData.email ?? ""),
+        phone: String(resumeData.phone ?? ""),
+        photo: (resumeData.photo as string) || "",
+        summary: String(resumeData.summary ?? ""),
+        skills: normalizedSkills,
+        languages: Array.isArray(resumeData.languages)
+          ? (resumeData.languages as unknown[]).map((lang) => String(lang))
+          : [],
+        experiences: Array.isArray(resumeData.experiences)
+          ? (resumeData.experiences as unknown[]).map((exp) => ({
+              role: String((exp as Record<string, unknown>)?.role ?? ""),
+              company: String((exp as Record<string, unknown>)?.company ?? ""),
+              dates: String((exp as Record<string, unknown>)?.dates ?? ""),
+              bullets: Array.isArray((exp as Record<string, unknown>)?.bullets)
+                ? ((exp as Record<string, unknown>)?.bullets as unknown[]).map(
+                    (bullet) => String(bullet)
+                  )
+                : [],
+            }))
+          : [],
+        education: Array.isArray(resumeData.education)
+          ? (resumeData.education as unknown[]).map((edu) => ({
+              school: String((edu as Record<string, unknown>)?.school ?? ""),
+              degree: String((edu as Record<string, unknown>)?.degree ?? ""),
+              dates: String((edu as Record<string, unknown>)?.dates ?? ""),
+            }))
+          : [],
+      };
+
+      setForm(nextForm);
+
+      const templateId = String((resumeRecord as Record<string, unknown>).templateId ?? "");
+      if (templateId) {
+        setSelectedId(templateId);
+      }
+      const preview = String((resumeRecord as Record<string, unknown>).previewTemplate ?? "");
+      if (preview === "navy" || preview === "clean" || preview === "slate") {
+        setPreviewTemplate(preview);
+      }
+    } catch (error) {
+      console.warn("Failed to hydrate resume from local storage", error);
+    }
+  }, []);
 
   useEffect(() => {
     const trimmed = targetJob.trim();
@@ -206,10 +284,27 @@ export default function ResumeBuilder() {
     }));
   };
 
+  const addExperience = () => {
+    setForm((prev) => ({
+      ...prev,
+      experiences: [
+        ...prev.experiences,
+        { role: "", company: "", dates: "", bullets: [] },
+      ],
+    }));
+  };
+
   const removeEducation = (index: number) => {
     setForm((prev) => ({
       ...prev,
       education: prev.education.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const removeExperience = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      experiences: prev.experiences.filter((_, idx) => idx !== index),
     }));
   };
 
@@ -327,23 +422,157 @@ export default function ResumeBuilder() {
         const target = previewRef.current;
         if (!target) return;
 
-        const canvas = await html2canvas(target, {
-          useCORS: true,
-          scale: 2,
-          backgroundColor: null,
-        });
-
-        const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF({
           orientation: "portrait",
           unit: "pt",
           format: "a4",
         });
         const pageWidth = pdf.internal.pageSize.getWidth();
-        const ratio = pageWidth / canvas.width;
-        const imgWidth = canvas.width * ratio;
-        const imgHeight = canvas.height * ratio;
-        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 24;
+        const contentWidth = pageWidth - margin * 2;
+        const contentHeight = pageHeight - margin * 2;
+        const isNavy = previewTemplate === "navy";
+        const sidebarEl = isNavy
+          ? target.querySelector("[data-resume-sidebar]")
+          : null;
+        const mainEl = isNavy
+          ? target.querySelector(`.${styles.navyMain}`)
+          : null;
+
+        const sliceToDataUrl = (
+          source: HTMLCanvasElement,
+          offsetY: number,
+          sliceHeight: number
+        ) => {
+          const pageCanvas = document.createElement("canvas");
+          pageCanvas.width = source.width;
+          pageCanvas.height = sliceHeight;
+          const ctx = pageCanvas.getContext("2d");
+          if (!ctx) return null;
+          ctx.drawImage(
+            source,
+            0,
+            offsetY,
+            source.width,
+            sliceHeight,
+            0,
+            0,
+            source.width,
+            sliceHeight
+          );
+          return pageCanvas.toDataURL("image/png");
+        };
+
+        if (
+          isNavy &&
+          sidebarEl instanceof HTMLElement &&
+          mainEl instanceof HTMLElement
+        ) {
+          const [sidebarCanvas, mainCanvas] = await Promise.all([
+            html2canvas(sidebarEl, {
+              useCORS: true,
+              scale: 2,
+              backgroundColor: null,
+              windowWidth: sidebarEl.scrollWidth,
+              windowHeight: sidebarEl.scrollHeight,
+              scrollY: -window.scrollY,
+            }),
+            html2canvas(mainEl, {
+              useCORS: true,
+              scale: 2,
+              backgroundColor: "#ffffff",
+              windowWidth: mainEl.scrollWidth,
+              windowHeight: mainEl.scrollHeight,
+              scrollY: -window.scrollY,
+            }),
+          ]);
+
+          const totalWidthPx = sidebarCanvas.width + mainCanvas.width;
+          const ratio = contentWidth / totalWidthPx;
+          const pageHeightPx = contentHeight / ratio;
+          const totalHeightPx = Math.max(sidebarCanvas.height, mainCanvas.height);
+          const sidebarWidth = sidebarCanvas.width * ratio;
+          const mainWidth = mainCanvas.width * ratio;
+          let offsetY = 0;
+
+          while (offsetY < totalHeightPx) {
+            const sliceHeight = Math.min(pageHeightPx, totalHeightPx - offsetY);
+            pdf.setFillColor(11, 41, 66);
+            pdf.rect(margin, margin, sidebarWidth, contentHeight, "F");
+
+            if (offsetY < sidebarCanvas.height) {
+              const sidebarSliceHeight = Math.min(
+                sliceHeight,
+                sidebarCanvas.height - offsetY
+              );
+              const sidebarImg = sliceToDataUrl(
+                sidebarCanvas,
+                offsetY,
+                sidebarSliceHeight
+              );
+              if (sidebarImg) {
+                pdf.addImage(
+                  sidebarImg,
+                  "PNG",
+                  margin,
+                  margin,
+                  sidebarWidth,
+                  sidebarSliceHeight * ratio
+                );
+              }
+            }
+
+            if (offsetY < mainCanvas.height) {
+              const mainSliceHeight = Math.min(
+                sliceHeight,
+                mainCanvas.height - offsetY
+              );
+              const mainImg = sliceToDataUrl(mainCanvas, offsetY, mainSliceHeight);
+              if (mainImg) {
+                pdf.addImage(
+                  mainImg,
+                  "PNG",
+                  margin + sidebarWidth,
+                  margin,
+                  mainWidth,
+                  mainSliceHeight * ratio
+                );
+              }
+            }
+
+            offsetY += sliceHeight;
+            if (offsetY < totalHeightPx) {
+              pdf.addPage();
+            }
+          }
+        } else {
+          const canvas = await html2canvas(target, {
+            useCORS: true,
+            scale: 2,
+            backgroundColor: "#ffffff",
+            windowWidth: target.scrollWidth,
+            windowHeight: target.scrollHeight,
+            scrollY: -window.scrollY,
+          });
+
+          const ratio = contentWidth / canvas.width;
+          const pageHeightPx = contentHeight / ratio;
+          let offsetY = 0;
+
+          while (offsetY < canvas.height) {
+            const sliceHeight = Math.min(pageHeightPx, canvas.height - offsetY);
+            const imgData = sliceToDataUrl(canvas, offsetY, sliceHeight);
+            if (imgData) {
+              const imgHeight = sliceHeight * ratio;
+              pdf.addImage(imgData, "PNG", margin, margin, contentWidth, imgHeight);
+            }
+            offsetY += sliceHeight;
+            if (offsetY < canvas.height) {
+              pdf.addPage();
+            }
+          }
+        }
 
         const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
         const roleSlug = (form.title || selectedTemplate.title || "role")
@@ -374,8 +603,12 @@ export default function ResumeBuilder() {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
       const pageText = content.items
-        .map((item: any) => ("str" in item ? item.str : ""))
-        .join(" ");
+        .map((item: any) => {
+          const text = "str" in item ? item.str : "";
+          const suffix = item?.hasEOL ? "\n" : " ";
+          return `${text}${suffix}`;
+        })
+        .join("");
       fullText += `${pageText}\n`;
     }
     return fullText.trim();
@@ -453,7 +686,7 @@ export default function ResumeBuilder() {
           body: JSON.stringify({
             userResume: extractedText,
             targetJob: targetJob.trim(),
-            jobDescription: jobDescription.trim(),
+            jobDescription: targetJob.trim(),
           }),
         });
         const data = (await response.json()) as AiResumeResult & { message?: string };
@@ -466,24 +699,14 @@ export default function ResumeBuilder() {
         }
         setAiResult(data);
         if (data.parsedResume) {
-          const parsedResume = data.parsedResume;
-          const normalizedSkills = (parsedResume.skills || []).map((skill: any) =>
-            typeof skill === "string"
-              ? { name: skill, rating: 3 }
-              : {
-                name: String(skill?.name ?? ""),
-                rating: Math.max(1, Math.min(5, Number(skill?.rating ?? 3))),
-              }
-          );
-          setForm((prev) => ({
-            ...prev,
-            ...parsedResume,
-            photo: parsedResume.photo || prev.photo,
-            skills: normalizedSkills,
-            languages: parsedResume.languages || [],
-            experiences: parsedResume.experiences || [],
-            education: parsedResume.education || [],
-          }));
+          const normalized = normalizeParsedResume(data.parsedResume);
+          if (normalized) {
+            setForm((prev) => ({
+              ...prev,
+              ...normalized,
+              photo: normalized.photo || prev.photo,
+            }));
+          }
         }
       }, "Generating AI feedback...");
     } catch (error) {
@@ -508,6 +731,67 @@ export default function ResumeBuilder() {
       return typeof name === "string" ? name : JSON.stringify(item);
     }
     return String(item ?? "");
+  };
+
+  const normalizeParsedResume = (parsed?: ResumeTemplate): ResumeTemplate | null => {
+    if (!parsed) return null;
+    const safeString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+    const safeArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+
+    const skills = safeArray(parsed.skills).map((skill: any) =>
+      typeof skill === "string"
+        ? { name: skill, rating: 3 }
+        : {
+            name: safeString(skill?.name),
+            rating: Math.max(1, Math.min(5, Number(skill?.rating ?? 3))),
+          }
+    );
+
+    const experiences = safeArray(parsed.experiences)
+      .map((exp: any) => ({
+        role: safeString(exp?.role),
+        company: safeString(exp?.company),
+        dates: safeString(exp?.dates),
+        bullets: safeArray(exp?.bullets).map((bullet) => safeString(bullet)).filter(Boolean),
+      }))
+      .filter((exp) => exp.role || exp.company || exp.dates || exp.bullets.length);
+
+    const education = safeArray(parsed.education)
+      .map((edu: any) => ({
+        school: safeString(edu?.school),
+        degree: safeString(edu?.degree),
+        dates: safeString(edu?.dates),
+      }))
+      .filter((edu) => edu.school || edu.degree || edu.dates);
+
+    const languages = safeArray(parsed.languages)
+      .map((lang) => safeString(lang))
+      .filter(Boolean);
+
+    const normalized: ResumeTemplate = {
+      ...emptyState(templates[0]),
+      name: safeString(parsed.name),
+      title: safeString(parsed.title),
+      location: safeString(parsed.location),
+      email: safeString(parsed.email),
+      phone: safeString(parsed.phone),
+      photo: typeof parsed.photo === "string" ? parsed.photo : "",
+      summary: safeString(parsed.summary),
+      skills,
+      languages,
+      experiences,
+      education,
+    };
+
+    const hasCore =
+      normalized.name ||
+      normalized.title ||
+      normalized.summary ||
+      normalized.skills.length ||
+      normalized.experiences.length ||
+      normalized.education.length;
+
+    return hasCore ? normalized : null;
   };
 
   const templateOptions = [
@@ -542,8 +826,8 @@ export default function ResumeBuilder() {
   const renderNavyTemplate = () => {
     const photoSrc = resolvePhotoSrc(form.photo);
     return (
-      <div ref={previewRef} className={styles.navyWrapper}>
-        <div className={styles.navySidebar}>
+      <div ref={previewRef} className={styles.navyWrapper} data-resume-template="navy">
+        <div className={styles.navySidebar} data-resume-sidebar>
           <div className={styles.photoCircle}>
             <Image src={photoSrc} alt="Profile" width={120} height={120} />
           </div>
@@ -636,7 +920,7 @@ export default function ResumeBuilder() {
                 <div className={styles.cleanTitle}>{form.title}</div>
               </div>
           </div>
-          <div className={styles.cleanMeta}>
+          <div className={`${styles.cleanMeta} ${styles.personalMeta}`}>
             <span>✉ {form.email}</span>
             <span>☎ {form.phone}</span>
             <span>📍 {form.location}</span>
@@ -714,7 +998,7 @@ export default function ResumeBuilder() {
           <div>
             <div className={styles.slateName}>{form.name}</div>
             <div className={styles.slateTitle}>{form.title}</div>
-            <div className={styles.slateMeta}>
+            <div className={`${styles.slateMeta} ${styles.personalMeta}`}>
               {form.email} • {form.phone} • {form.location}
             </div>
           </div>
@@ -830,7 +1114,7 @@ export default function ResumeBuilder() {
                     Upload a PDF or DOCX. We will extract the text before sending it to AI.
                   </p>
                   <div className="form-group">
-                    <label htmlFor="target-job">Target Role *</label>
+                    <label htmlFor="target-job">Target Role or Job Description *</label>
                     <input
                       id="target-job"
                       type="text"
@@ -839,20 +1123,7 @@ export default function ResumeBuilder() {
                       onChange={(e) => {
                         setTargetJob(e.target.value);
                       }}
-                      placeholder="e.g. Primary English Teacher"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="job-description">Job Description *</label>
-                    <textarea
-                      id="job-description"
-                      className="form-control"
-                      value={jobDescription}
-                      onChange={(e) => {
-                        setJobDescription(e.target.value);
-                      }}
-                      placeholder="Paste the job description here..."
+                      placeholder="e.g. Frontend Developer or paste a short job summary"
                       required
                     />
                   </div>
@@ -888,7 +1159,7 @@ export default function ResumeBuilder() {
                       disabled={
                         isExtracting ||
                         isAnalyzing ||
-                        !jobDescription.trim() ||
+                        !targetJob.trim() ||
                         !extractedText.trim()
                       }
                       aria-busy={isAnalyzing}
@@ -1203,8 +1474,18 @@ export default function ResumeBuilder() {
                               }
                             />
                           </div>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => removeExperience(idx)}
+                          >
+                            Remove Experience
+                          </button>
                         </div>
                       ))}
+                      <button type="button" className="btn-primary" onClick={addExperience}>
+                        Add Experience
+                      </button>
                     </div>
                   </div>
                 </details>
@@ -1358,16 +1639,28 @@ export default function ResumeBuilder() {
                 ? renderCleanTemplate()
                 : renderSlateTemplate()}
 
-            <button
-              type="button"
-              className={`btn-primary ${styles.downloadResume}`}
-              title="Save and Download PDF"
-              onClick={saveDownloadResume}
-              disabled={isSaving}
-              aria-busy={isSaving}
-            >
-              {isSaving ? "Saving..." : "Save and Download"}
-            </button>
+            <div className={styles.downloadActions}>
+              <button
+                type="button"
+                className={`btn-primary ${styles.downloadResume}`}
+                title="Save and Download PDF"
+                onClick={saveDownloadResume}
+                disabled={isSaving}
+                aria-busy={isSaving}
+              >
+                {isSaving ? "Saving..." : "Save and Download"}
+              </button>
+              <button
+                type="button"
+                className={`btn-primary ${styles.tabButton}`}
+                onClick={() => {
+                  setActiveTab("manual");
+                  setManualMode("edit");
+                }}
+              >
+                ✏️ Edit Resume
+              </button>
+            </div>
           </div>
         </div>
       </>

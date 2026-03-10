@@ -33,6 +33,7 @@ const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: st
   return [
     "You are an expert resume coach.",
     "Analyze the resume text and provide improvement feedback.",
+    "Extract and populate the parsedResume strictly from the resume content. Do not omit sections that exist; use empty strings only if truly missing.",
     "Return STRICT JSON only, no extra text, using this schema:",
     `{
   "score": 0-100,

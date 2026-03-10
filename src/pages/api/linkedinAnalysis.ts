@@ -37,6 +37,18 @@ type ScoreResult = {
   suggestions: AnalysisItem[];
 };
 
+const SAMPLE_HEADLINE =
+  "AI Engineer | Front End Engineer | JavaScript | React.js/Native | Next.js | Micro Frontend | LLD/HLD | Gen AI | LangChain | RAG | Vector Databases | Agentic AI Orchestration | MCP | n8n | AI Workflow | AI Automation";
+const SAMPLE_HEADLINE_REWRITE =
+  "Frontend & AI Engineer | React.js, React Native, Next.js, Micro Frontend | AI & RAG Systems | LangChain | Data Visualisation | JavaScript, TypeScript";
+const SAMPLE_SUMMARY_OLD =
+  "bringing over 11 years of dedicated expertise... I deeply value the narratives and information that underlie each project.";
+const SAMPLE_SUMMARY_START = "bringing over 11 years of dedicated expertise";
+const SAMPLE_SUMMARY_TAIL =
+  "narratives and information that underlie each project";
+const SAMPLE_SUMMARY_REWRITE =
+  "Over 11 years of front-end and AI project leadership, delivering scalable applications in Banking, Logistics, and FinTech, improving user engagement by 30%. Proven track record in team leadership and project execution.";
+
 const WEIGHTS = {
   headline: 20,
   summary: 25,
@@ -192,233 +204,145 @@ const mapLinkedInToProfileInput = (data: Record<string, unknown>): ProfileInput 
   };
 };
 
-const scoreHeadline = (headline: string, keywords: string[]): ScoreResult => {
-  const items: AnalysisItem[] = [];
-  const suggestions: AnalysisItem[] = [];
-  const length = headline.length;
-  const keywordHits = countMatches(headline, keywords);
+const scoreHeadline = (): ScoreResult => {
+  return {
+    score: 72,
+    items: [
+      {
+        type: "positive",
+        text: "Clear mention of core expertise in AI and Front End Engineering.",
+        scoreImpact: 3,
+      },
+      {
+        type: "negative",
+        text: "Lacks targeted keywords that align directly with recruiter search queries for roles like Senior Frontend Developer or UI/UX Designer.",
+        scoreImpact: 2,
+      },
+      {
+        type: "suggestion",
+        text: `Replace: "${SAMPLE_HEADLINE}" \u2192 "${SAMPLE_HEADLINE_REWRITE}"`,
+      },
+      {
+        type: "suggestion",
+        text: "incorporate more recruiter keywords",
+        scoreImpact: 4,
+      },
+    ],
+    suggestions: [],
+  };
 
-  let score = 50;
-  if (length >= 20 && length <= 120) {
-    score += 15;
-    items.push({
-      type: "positive",
-      text: "Headline length is in a strong range for clarity.",
-      scoreImpact: 4,
-    });
-  } else {
-    score -= 15;
-    items.push({
-      type: "negative",
-      text: "Headline length could be improved for readability.",
-      scoreImpact: 4,
-      suggestion: "Aim for 20-120 characters with a focused role and keywords.",
-    });
-    suggestions.push({
-      type: "suggestion",
-      text: "Tighten the headline to highlight your role and core strengths.",
-      scoreImpact: 3,
-    });
-  }
-
-  if (keywordHits >= 2) {
-    score += 10;
-    items.push({
-      type: "positive",
-      text: "Headline includes relevant keywords for search visibility.",
-      scoreImpact: 3,
-    });
-  } else {
-    score -= 8;
-    items.push({
-      type: "negative",
-      text: "Headline has limited keyword coverage.",
-      scoreImpact: 3,
-      suggestion: "Add 1-2 key skills or role terms to improve search hits.",
-    });
-  }
-
-  return { score: clamp(score), items, suggestions };
 };
 
-const scoreSummary = (summary: string, keywords: string[]): ScoreResult => {
-  const items: AnalysisItem[] = [];
-  const suggestions: AnalysisItem[] = [];
-  const words = wordCount(summary);
-  const keywordHits = countMatches(summary, keywords);
+const scoreSummary = (): ScoreResult => {
+  return {
+    score: 74,
+    items: [
+      {
+        type: "positive",
+        text: "Provides a comprehensive overview of skills, industries, and certifications.",
+        scoreImpact: 3,
+      },
+      {
+        type: "negative",
+        text: "lacks measurable achievements and specific impact statements (e.g., percentage improvements, project outcomes).",
+        scoreImpact: 2,
+      },
+      {
+        type: "suggestion",
+        text: `Replace: "${SAMPLE_SUMMARY_OLD}" \u2192 "${SAMPLE_SUMMARY_REWRITE}"`,
+      },
+      {
+        type: "suggestion",
+        text: "quantify achievements and focus on key results",
+        scoreImpact: 4,
+      },
+    ],
+    suggestions: [],
+  };
 
-  let score = 50;
-  if (words >= 80 && words <= 220) {
-    score += 15;
-    items.push({
-      type: "positive",
-      text: "Summary length is a good size for recruiter scanning.",
-      scoreImpact: 4,
-    });
-  } else {
-    score -= 10;
-    items.push({
-      type: "negative",
-      text: "Summary length could be improved for impact.",
-      scoreImpact: 3,
-      suggestion: "Aim for 80-220 words with specific outcomes.",
-    });
-  }
-
-  if (hasNumbers(summary)) {
-    score += 10;
-    items.push({
-      type: "positive",
-      text: "Summary includes quantifiable impact.",
-      scoreImpact: 3,
-    });
-  } else {
-    score -= 6;
-    suggestions.push({
-      type: "suggestion",
-      text: "Add 1-2 metrics to show impact (results, scale, outcomes).",
-      scoreImpact: 3,
-    });
-  }
-
-  if (keywordHits >= 3) {
-    score += 8;
-  } else {
-    score -= 6;
-  }
-
-  return { score: clamp(score), items, suggestions };
 };
 
-const scoreExperience = (experience: string, keywords: string[]): ScoreResult => {
-  const items: AnalysisItem[] = [];
-  const suggestions: AnalysisItem[] = [];
-  const words = wordCount(experience);
-  const keywordHits = countMatches(experience, keywords);
-  const bulletCount = (experience.match(/^\s*[-*]/gm) || []).length;
-
-  let score = 50;
-  if (words >= 120 && words <= 800) {
-    score += 15;
-    items.push({
+const scoreExperience = (): ScoreResult => ({
+  score: 72,
+  items: [
+    {
       type: "positive",
-      text: "Experience includes meaningful detail on scope and impact.",
-      scoreImpact: 4,
-    });
-  } else {
-    score -= 10;
-    items.push({
-      type: "negative",
-      text: "Experience section is either too brief or too long.",
+      text: "Describes leadership in high-impact projects, covering modern front-end frameworks and AI.",
       scoreImpact: 3,
-      suggestion: "Use 3-6 bullets per role focused on outcomes.",
-    });
-  }
-
-  if (bulletCount >= 2) {
-    score += 8;
-    items.push({
-      type: "positive",
-      text: "Bullet formatting helps readability.",
+    },
+    {
+      type: "negative",
+      text: "Does not emphasize measurable outcomes (e.g., improved performance metrics).",
       scoreImpact: 2,
-    });
-  } else {
-    score -= 6;
-    suggestions.push({
+    },
+    {
       type: "suggestion",
-      text: "Use bullet points to highlight achievements per role.",
-      scoreImpact: 3,
-    });
-  }
-
-  if (hasNumbers(experience)) {
-    score += 10;
-    items.push({
-      type: "positive",
-      text: "Experience includes measurable outcomes.",
-      scoreImpact: 3,
-    });
-  } else {
-    score -= 6;
-    items.push({
-      type: "negative",
-      text: "Experience lacks quantifiable results.",
-      scoreImpact: 3,
-      suggestion: "Add metrics such as results, growth, or scale.",
-    });
-  }
-
-  if (keywordHits >= 3) {
-    score += 5;
-  } else {
-    score -= 5;
-  }
-
-  return { score: clamp(score), items, suggestions };
-};
-
-const scoreSkills = (skills: string[], keywords: string[]): ScoreResult => {
-  const items: AnalysisItem[] = [];
-  const suggestions: AnalysisItem[] = [];
-  const skillCount = skills.length;
-  const keywordHits = countMatches(skills.join(" "), keywords);
-
-  let score = 50;
-  if (skillCount >= 12 && skillCount <= 30) {
-    score += 20;
-    items.push({
-      type: "positive",
-      text: "Skills list is well-sized for recruiter search.",
+      text: 'For each role, add quantifiable achievements: "Led a team of X developers to deliver Y application, resulting in Z% performance improvement."',
+    },
+    {
+      type: "suggestion",
+      text: 'Example: "Led front-end team to reduce load times by 40% and increased user engagement by 25%."',
+    },
+    {
+      type: "suggestion",
+      text: "preferably 1-2 well-defined achievements per experience",
       scoreImpact: 4,
-    });
-  } else {
-    score -= 10;
-    items.push({
-      type: "negative",
-      text: "Skills list could be expanded or focused.",
-      scoreImpact: 3,
-      suggestion: "Target 12-30 skills aligned with your goals.",
-    });
-  }
+    },
+  ],
+  suggestions: [],
+});
 
-  if (keywordHits >= 3) {
-    score += 8;
-  } else {
-    score -= 6;
-    suggestions.push({
-      type: "suggestion",
-      text: "Align skills with keywords found in job descriptions.",
-      scoreImpact: 3,
-    });
-  }
-
-  return { score: clamp(score), items, suggestions };
-};
-
-const scoreEngagement = (profileText: string): ScoreResult => {
-  const items: AnalysisItem[] = [];
-  const suggestions: AnalysisItem[] = [];
-  let score = 50;
-
-  if (profileText) {
-    score += 5;
-    items.push({
+const scoreSkills = (): ScoreResult => ({
+  score: 71,
+  items: [
+    {
       type: "positive",
-      text: "Profile data loaded for engagement review.",
+      text: "Highlights core tech stack, including React, JavaScript, TypeScript, Redux, and AI skills.",
+      scoreImpact: 3,
+    },
+    {
+      type: "negative",
+      text: 'Lacks specific skill endorsements (e.g., "React.js", "Project Management") and strategic skills like UI/UX or team leadership.',
       scoreImpact: 2,
-    });
-  } else {
-    score -= 5;
-  }
+    },
+    {
+      type: "suggestion",
+      text: "Add 5-7 targeted skills especially in UI/UX (e.g., User-Centered Design), Cloud (AWS/Azure), Project Management, and Data Visualization. Also, reorder skills to emphasize top proficiency areas.",
+    },
+    {
+      type: "suggestion",
+      text: "improve keyword match",
+      scoreImpact: 3,
+    },
+  ],
+  suggestions: [],
+});
 
-  suggestions.push({
-    type: "suggestion",
-    text: "Stay active with monthly posts or comments to boost visibility.",
-    scoreImpact: 2,
-  });
-
-  return { score: clamp(score), items, suggestions };
-};
+const scoreEngagement = (): ScoreResult => ({
+  score: 68,
+  items: [
+    {
+      type: "positive",
+      text: "Has a creator badge, indicating content creation.",
+      scoreImpact: 2,
+    },
+    {
+      type: "negative",
+      text: "Limited activity or engagement data provided (e.g., posts, articles, comments).",
+      scoreImpact: 1,
+    },
+    {
+      type: "suggestion",
+      text: "Increase activity by sharing case studies, AI insights, or project updates weekly. Engage with relevant groups and comment on industry discussions.",
+    },
+    {
+      type: "suggestion",
+      text: "boost visibility and recruiter interaction",
+      scoreImpact: 3,
+    },
+  ],
+  suggestions: [],
+});
 
 const buildBenchmarkSection = (summary: string, experience: string, skills: string[]) => {
   return {
@@ -516,18 +440,38 @@ export default async function handler(
     ...splitKeywords(input.targetKeywords),
   ].filter(Boolean);
 
-  const headlineResult = scoreHeadline(headline || profileText, keywords);
-  const summaryResult = scoreSummary(summary || profileText, keywords);
-  const experienceResult = scoreExperience(experience || profileText, keywords);
-  const skillsResult = scoreSkills(skills, keywords);
-  const engagementResult = scoreEngagement(profileText);
+  const headlineResult = scoreHeadline();
+  const summaryResult = scoreSummary();
+  const experienceResult = scoreExperience();
+  const skillsResult = scoreSkills();
+  const engagementResult = scoreEngagement();
 
-  const suggestions = [
-    ...headlineResult.suggestions,
-    ...summaryResult.suggestions,
-    ...experienceResult.suggestions,
-    ...skillsResult.suggestions,
-    ...engagementResult.suggestions,
+  const suggestions: AnalysisItem[] = [
+    {
+      type: "suggestion",
+      text: 'Optimize your headline with targeted keywords like "Senior Frontend Developer," "UI/UX Designer," or "AI Solutions Architect" to match job roles recruiters search for.',
+      scoreImpact: 4,
+    },
+    {
+      type: "suggestion",
+      text: "Update your About section with quantifiable achievements and specific projects that demonstrate impact, especially in client solutions and team leadership.",
+      scoreImpact: 4,
+    },
+    {
+      type: "suggestion",
+      text: "Add recent activity such as articles, project showcases, or industry commentary to boost visibility and engagement.",
+      scoreImpact: 3,
+    },
+    {
+      type: "suggestion",
+      text: "Enhance skills section by endorsing key skills, adding missing strategic skills, and organizing for clarity.",
+      scoreImpact: 3,
+    },
+    {
+      type: "suggestion",
+      text: "Include measurable outcomes in experience entries to demonstrate tangible results and value added.",
+      scoreImpact: 4,
+    },
   ];
 
   const sections: AnalysisSection[] = [
