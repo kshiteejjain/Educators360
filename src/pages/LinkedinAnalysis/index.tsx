@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Layout from "@/components/Layout/Layout";
 import styles from "./LinkedinAnalysis.module.css";
-import LinkedinCraftResult from "./LinkedinCraftResult";
+import LinkedinCraftResult from "@/components/LinkedinCraftResult/LinkedinCraftResult";
 import { useLoader } from "@/components/Loader/LoaderProvider";
 import { getSession } from "@/utils/authSession";
 import { getDb } from "@/utils/firebase";
