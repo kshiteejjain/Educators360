@@ -119,6 +119,46 @@
   font-size: 0.8rem;
 }
 
+.noLinkedinRow {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.noLinkedinToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.noLinkedinCard {
+  grid-column: 1 / -1;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 18px 20px;
+  border: 1px solid #c7d2fe;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.noLinkedinHeader h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.noLinkedinHeader p {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.noLinkedinTextarea {
+  min-height: 140px;
+}
+
 /* Results Section */
 .resultsSection {
   animation: fadeIn 0.4s ease;

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Layout from "@/components/Layout/Layout";
 import styles from "./LinkedinAnalysis.module.css";
+import LinkedinCraftResult from "./LinkedinCraftResult";
 import { useLoader } from "@/components/Loader/LoaderProvider";
 import { getSession } from "@/utils/authSession";
 import { getDb } from "@/utils/firebase";
@@ -77,6 +78,18 @@ type AnalysisResult = {
   };
 };
 
+type CraftResult = {
+  targetRoleSummary: string;
+  profileBlueprint: {
+    headline: string;
+    about: string;
+    experienceBullets: string[];
+    skills: string[];
+    activityIdeas: string[];
+  };
+  strategicKeywordCloud: string[];
+  actionPlan: string[];
+};
 const sectionColorClass = (color: string) => {
   const normalized = color.toLowerCase();
   if (normalized.includes("yellow")) return styles["section-yellow"];
@@ -341,8 +354,10 @@ export default function LinkedinAnalysis() {
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [targetRole, setTargetRole] = useState("");
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [craftResult, setCraftResult] = useState<CraftResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [noLinkedin, setNoLinkedin] = useState(false);
   const [resumeStatus, setResumeStatus] = useState<"checking" | "present" | "missing">(
     "checking"
   );
@@ -435,7 +450,7 @@ export default function LinkedinAnalysis() {
     }
 
     const nextErrors: { linkedinUrl?: string; targetRole?: string } = {};
-    if (!linkedinUrl.trim()) {
+    if (!noLinkedin && !linkedinUrl.trim()) {
       nextErrors.linkedinUrl = "Please enter a valid LinkedIn profile URL";
     }
     if (!targetRole.trim()) {
@@ -453,7 +468,11 @@ export default function LinkedinAnalysis() {
         const response = await fetch("/api/linkedinAnalysis", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profileUrl: linkedinUrl, targetRole }),
+          body: JSON.stringify(
+            noLinkedin
+              ? { profileText: resumeCvText, targetRole }
+              : { profileUrl: linkedinUrl, targetRole }
+          ),
         });
         const baseData = (await response.json()) as
           | (Omit<AnalysisResult, "profileScore" | "aiAnalysis"> & { message?: string })
@@ -462,6 +481,35 @@ export default function LinkedinAnalysis() {
           throw new Error(
             "message" in baseData ? baseData.message || "Failed to analyze profile." : ""
           );
+        }
+
+        if (noLinkedin) {
+          const craftResponse = await fetch("/api/linkedinProfileCraft", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              profileData: {
+                ...(baseData as AnalysisResult).profileData,
+                cvText: resumeCvText,
+                profileText: resumeCvText,
+              },
+              sections: (baseData as AnalysisResult).sections,
+              targetRole,
+            }),
+          });
+          const craftData = (await craftResponse.json()) as
+            | (CraftResult & { message?: string })
+            | { message?: string };
+          if (!craftResponse.ok) {
+            throw new Error(
+              "message" in craftData
+                ? craftData.message || "Failed to craft LinkedIn profile."
+                : ""
+            );
+          }
+          setCraftResult(craftData as CraftResult);
+          setAnalysisResult(null);
+          return;
         }
 
         const aiResponse = await fetch("/api/linkedinAiAnalysis", {
@@ -547,6 +595,7 @@ export default function LinkedinAnalysis() {
             },
           },
         });
+        setCraftResult(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to analyze profile.");
         console.error("LinkedIn analysis failed", err);
@@ -598,34 +647,49 @@ export default function LinkedinAnalysis() {
             </div>
           )}
           <form onSubmit={handleSubmit} className={styles.form}>
-            <div className="form-group">
-              <label htmlFor="linkedinUrl">
-                Enter Your LinkedIn Profile URL *
+            <div className={styles.noLinkedinRow}>
+              <label className={styles.noLinkedinToggle}>
+                <input
+                  type="checkbox"
+                  checked={noLinkedin}
+                  onChange={(e) => {
+                    setNoLinkedin(e.target.checked);
+                  }}
+                  disabled={isLoading}
+                />
+                No LinkedIn profile
               </label>
-              <input
-                id="linkedinUrl"
-                type="url"
-                value={linkedinUrl}
-                onChange={(e) => {
-                  setLinkedinUrl(e.target.value);
-                  if (fieldErrors.linkedinUrl) {
-                    setFieldErrors((prev) => ({ ...prev, linkedinUrl: undefined }));
-                  }
-                }}
-                placeholder="https://www.linkedin.com/in/yourprofile/"
-                className="form-control"
-                disabled={isLoading}
-                aria-invalid={Boolean(fieldErrors.linkedinUrl)}
-                aria-describedby={fieldErrors.linkedinUrl ? "linkedin-url-error" : undefined}
-                required
-              />
-              <p className={styles.hint}>Example: https://www.linkedin.com/in/kshiteejjain/</p>
-              {fieldErrors.linkedinUrl && (
-                <p id="linkedin-url-error" className={styles.fieldError}>
-                  {fieldErrors.linkedinUrl}
-                </p>
-              )}
             </div>
+            {!noLinkedin && (
+              <div className="form-group">
+                <label htmlFor="linkedinUrl">
+                  Enter Your LinkedIn Profile URL *
+                </label>
+                <input
+                  id="linkedinUrl"
+                  type="url"
+                  value={linkedinUrl}
+                  onChange={(e) => {
+                    setLinkedinUrl(e.target.value);
+                    if (fieldErrors.linkedinUrl) {
+                      setFieldErrors((prev) => ({ ...prev, linkedinUrl: undefined }));
+                    }
+                  }}
+                  placeholder="https://www.linkedin.com/in/yourprofile/"
+                  className="form-control"
+                  disabled={isLoading}
+                  aria-invalid={Boolean(fieldErrors.linkedinUrl)}
+                  aria-describedby={fieldErrors.linkedinUrl ? "linkedin-url-error" : undefined}
+                  required
+                />
+                <p className={styles.hint}>Example: https://www.linkedin.com/in/kshiteejjain/</p>
+                {fieldErrors.linkedinUrl && (
+                  <p id="linkedin-url-error" className={styles.fieldError}>
+                    {fieldErrors.linkedinUrl}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="form-group">
               <label htmlFor="targetRole">
                 Target Role *
@@ -863,10 +927,13 @@ export default function LinkedinAnalysis() {
               </button>
           </div>
         )}
+        {craftResult && (
+          <LinkedinCraftResult
+            result={craftResult}
+            targetRole={targetRole}
+          />
+        )}
       </div>
     </Layout>
   );
 }
-
-
-
