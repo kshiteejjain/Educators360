@@ -31,6 +31,26 @@ type AiAnalysis = {
   aiScore: number;
   scoreRationale: string;
   recommendations: string[];
+  alignmentSummary?: {
+    fitSummary?: string;
+    strengths?: string[];
+    gaps?: string[];
+    priorityFixes?: string[];
+  };
+  replacementMap?: {
+    section:
+      | "Headline"
+      | "About"
+      | "Experience"
+      | "Skills"
+      | "Activity"
+      | "Benchmarking"
+      | "Final Suggestions"
+      | "General";
+    replace: string;
+    with: string;
+    rationale?: string;
+  }[];
   modifications: {
     headline?: string;
     about?: string;
@@ -89,13 +109,16 @@ const buildAiPrompt = (payload: AiRequest) => {
     "I am providing you with my LinkedIn Profile and my CV.",
     "Please perform a 'Gap & Synthesis Analysis' to optimize my professional brand.",
     "Cross-reference both documents to find the best data, but be critical of where information is lacking.",
+    "Explicitly compare LinkedIn + CV content against the target role requirements and identify fit, gaps, and missing keywords.",
     "Structure your response exactly as follows:",
     `1. Profile Score: Current score out of 100 based on alignment with the ${targetRole}.`,
+    `2. Target Role Alignment: Brief fit summary, top strengths, top gaps, and priority fixes for ${targetRole}.`,
     "2. Section-by-Section Analysis: For each section (Headline, About, Experience, Skills, Activity):",
     "? What's working well: The strongest points found in my LinkedIn profile",
     "? What's missing or weak: Identify specific gaps, lack of metrics, generic language, or missed opportunities for the target role in this specific section.",
     "?? Conflict Check: Note any discrepancies between the CV and LinkedIn (e.g., different titles or dates).",
     "?? Replace / Action Plan: Provide the final, optimized copy I should use. Synthesize the best data from the CV with the best narrative from LinkedIn.",
+    "In all suggestions, include explicit Replace → With pairs derived from the current LinkedIn/CV text and tailored to the target role.",
     "?? Estimated Score Gain: Predicted impact of these changes.",
     `3. Strategic Keyword Cloud: List the top 15 keywords for ${targetRole} that must be added to my profile.`,
     "Use the provided data only; do not invent roles, dates, or companies.",
@@ -104,6 +127,20 @@ const buildAiPrompt = (payload: AiRequest) => {
   "aiScore": 0-100,
   "scoreRationale": "2-3 sentences",
   "recommendations": ["item1","item2","item3","item4","item5"],
+  "alignmentSummary": {
+    "fitSummary": "2-3 sentences on alignment with the target role using LinkedIn + CV data",
+    "strengths": ["strength1","strength2","strength3"],
+    "gaps": ["gap1","gap2","gap3"],
+    "priorityFixes": ["fix1","fix2","fix3"]
+  },
+  "replacementMap": [
+    {
+      "section": "Headline (or About, Experience, Skills, Activity, Benchmarking, Final Suggestions, General)",
+      "replace": "exact phrase from LinkedIn/CV to replace",
+      "with": "improved phrase tailored to the target role",
+      "rationale": "short reason"
+    }
+  ],
   "modifications": {
     "headline": "improved headline (max 120 chars)",
     "about": "improved about/summary (120-200 words)",

@@ -29,6 +29,7 @@ type ProfileInput = {
   education?: string;
   profileText?: string;
   targetKeywords?: string[];
+  targetRole?: string;
 };
 
 type ScoreResult = {
@@ -37,18 +38,6 @@ type ScoreResult = {
   suggestions: AnalysisItem[];
 };
 
-const SAMPLE_HEADLINE =
-  "AI Engineer | Front End Engineer | JavaScript | React.js/Native | Next.js | Micro Frontend | LLD/HLD | Gen AI | LangChain | RAG | Vector Databases | Agentic AI Orchestration | MCP | n8n | AI Workflow | AI Automation";
-const SAMPLE_HEADLINE_REWRITE =
-  "Frontend & AI Engineer | React.js, React Native, Next.js, Micro Frontend | AI & RAG Systems | LangChain | Data Visualisation | JavaScript, TypeScript";
-const SAMPLE_SUMMARY_OLD =
-  "bringing over 11 years of dedicated expertise... I deeply value the narratives and information that underlie each project.";
-const SAMPLE_SUMMARY_START = "bringing over 11 years of dedicated expertise";
-const SAMPLE_SUMMARY_TAIL =
-  "narratives and information that underlie each project";
-const SAMPLE_SUMMARY_REWRITE =
-  "Over 11 years of front-end and AI project leadership, delivering scalable applications in Banking, Logistics, and FinTech, improving user engagement by 30%. Proven track record in team leadership and project execution.";
-
 const WEIGHTS = {
   headline: 20,
   summary: 25,
@@ -56,19 +45,6 @@ const WEIGHTS = {
   skills: 20,
   engagement: 10,
 };
-
-const DEFAULT_KEYWORDS = [
-  "education",
-  "teaching",
-  "training",
-  "leadership",
-  "curriculum",
-  "assessment",
-  "learning",
-  "classroom",
-  "student",
-  "mentoring",
-];
 
 const clamp = (value: number, min = 0, max = 100) =>
   Math.max(min, Math.min(max, value));
@@ -107,6 +83,34 @@ const compactText = (value: unknown) => {
   if (typeof value !== "string") return "";
   return value.trim();
 };
+
+const clip = (value: string, max = 140) =>
+  value.length > max ? `${value.slice(0, max)}...` : value;
+
+const normalizeRoleKeywords = (targetRole?: string) =>
+  (targetRole || "")
+    .split(/[\s,/|]+/)
+    .map((word) => word.trim().toLowerCase())
+    .filter((word) => word.length > 2);
+
+const buildHeadlineRewrite = (targetRole: string, skills: string[]) => {
+  const skillSnippet = skills.slice(0, 3).join(", ");
+  const rolePart = targetRole ? targetRole : "Target Role";
+  return skillSnippet ? `${rolePart} | ${skillSnippet}` : rolePart;
+};
+
+const buildSummaryRewrite = (targetRole: string, skills: string[]) => {
+  const rolePart = targetRole ? targetRole : "Target Role";
+  const skillSnippet = skills.slice(0, 4).join(", ");
+  const skillLine = skillSnippet ? `Key strengths: ${skillSnippet}.` : "";
+  return `${rolePart} with proven impact in [domain/industry]. Focused on [core responsibilities] and measurable outcomes (e.g., [metric 1], [metric 2]). ${skillLine} Seeking to deliver results aligned with ${rolePart} requirements.`;
+};
+
+const buildExperienceRewrite = (targetRole: string) =>
+  `Reframe each role to highlight ${targetRole || "target role"}-relevant responsibilities and outcomes. Example: "Delivered [result] by applying [skill/tool], improving [metric] by [X%]."`;
+
+const buildSkillsRewrite = (targetRole: string) =>
+  `Prioritize skills aligned to ${targetRole || "your target role"} and remove unrelated skills. Group by categories (e.g., tools, methods, domain knowledge).`;
 
 const buildProfileText = (parts: string[]) =>
   parts.map((part) => part.trim()).filter(Boolean).join("\n");
@@ -204,147 +208,186 @@ const mapLinkedInToProfileInput = (data: Record<string, unknown>): ProfileInput 
   };
 };
 
-const scoreHeadline = (): ScoreResult => {
+const scoreHeadline = (
+  headline: string,
+  targetRole: string,
+  roleKeywords: string[],
+  skills: string[]
+): ScoreResult => {
+  const roleLabel = targetRole || "your target role";
+  const matchCount = countMatches(headline, roleKeywords);
+  const hasHeadline = Boolean(headline.trim());
+  const rewrite = buildHeadlineRewrite(roleLabel, skills);
   return {
     score: 72,
     items: [
-      {
-        type: "positive",
-        text: "Clear mention of core expertise in AI and Front End Engineering.",
-        scoreImpact: 3,
-      },
+      ...(hasHeadline && matchCount > 0
+        ? [
+            {
+              type: "positive" as const,
+              text: `Includes some ${roleLabel} keywords in the headline.`,
+              scoreImpact: 3,
+            },
+          ]
+        : []),
       {
         type: "negative",
-        text: "Lacks targeted keywords that align directly with recruiter search queries for roles like Senior Frontend Developer or UI/UX Designer.",
+        text: `Headline does not clearly position you for ${roleLabel}.`,
         scoreImpact: 2,
       },
       {
         type: "suggestion",
-        text: `Replace: "${SAMPLE_HEADLINE}" \u2192 "${SAMPLE_HEADLINE_REWRITE}"`,
+        text: `Replace: "${clip(headline || "current headline")}" -> "${rewrite}"`,
       },
       {
         type: "suggestion",
-        text: "incorporate more recruiter keywords",
+        text: `Add 2-3 ${roleLabel} keywords recruiters search for.`,
         scoreImpact: 4,
       },
     ],
     suggestions: [],
   };
-
 };
 
-const scoreSummary = (): ScoreResult => {
+const scoreSummary = (
+  summary: string,
+  targetRole: string,
+  roleKeywords: string[],
+  skills: string[]
+): ScoreResult => {
+  const roleLabel = targetRole || "your target role";
+  const matchCount = countMatches(summary, roleKeywords);
+  const rewrite = buildSummaryRewrite(roleLabel, skills);
   return {
     score: 74,
     items: [
-      {
-        type: "positive",
-        text: "Provides a comprehensive overview of skills, industries, and certifications.",
-        scoreImpact: 3,
-      },
+      ...(summary.trim() && matchCount > 0
+        ? [
+            {
+              type: "positive" as const,
+              text: `Summary mentions ${roleLabel} keywords and responsibilities.`,
+              scoreImpact: 3,
+            },
+          ]
+        : []),
       {
         type: "negative",
-        text: "lacks measurable achievements and specific impact statements (e.g., percentage improvements, project outcomes).",
+        text: `Summary lacks clear alignment to ${roleLabel} and measurable outcomes.`,
         scoreImpact: 2,
       },
       {
         type: "suggestion",
-        text: `Replace: "${SAMPLE_SUMMARY_OLD}" \u2192 "${SAMPLE_SUMMARY_REWRITE}"`,
+        text: `Replace: "${clip(summary || "current summary")}" -> "${rewrite}"`,
       },
       {
         type: "suggestion",
-        text: "quantify achievements and focus on key results",
+        text: "Quantify achievements and focus on role-relevant impact.",
         scoreImpact: 4,
       },
     ],
     suggestions: [],
   };
-
 };
 
-const scoreExperience = (): ScoreResult => ({
-  score: 72,
-  items: [
-    {
-      type: "positive",
-      text: "Describes leadership in high-impact projects, covering modern front-end frameworks and AI.",
-      scoreImpact: 3,
-    },
-    {
-      type: "negative",
-      text: "Does not emphasize measurable outcomes (e.g., improved performance metrics).",
-      scoreImpact: 2,
-    },
-    {
-      type: "suggestion",
-      text: 'For each role, add quantifiable achievements: "Led a team of X developers to deliver Y application, resulting in Z% performance improvement."',
-    },
-    {
-      type: "suggestion",
-      text: 'Example: "Led front-end team to reduce load times by 40% and increased user engagement by 25%."',
-    },
-    {
-      type: "suggestion",
-      text: "preferably 1-2 well-defined achievements per experience",
-      scoreImpact: 4,
-    },
-  ],
-  suggestions: [],
-});
+const scoreExperience = (experience: string, targetRole: string): ScoreResult => {
+  const roleLabel = targetRole || "your target role";
+  const rewrite = buildExperienceRewrite(roleLabel);
+  return {
+    score: 72,
+    items: [
+      ...(experience.trim()
+        ? [
+            {
+              type: "positive" as const,
+              text: "Experience section is present and can be aligned to the target role.",
+              scoreImpact: 3,
+            },
+          ]
+        : []),
+      {
+        type: "negative",
+        text: `Experience does not emphasize ${roleLabel}-specific outcomes and impact.`,
+        scoreImpact: 2,
+      },
+      {
+        type: "suggestion",
+        text: rewrite,
+      },
+      {
+        type: "suggestion",
+        text: "Add 1-2 measurable outcomes per role that map directly to the target role.",
+        scoreImpact: 4,
+      },
+    ],
+    suggestions: [],
+  };
+};
 
-const scoreSkills = (): ScoreResult => ({
-  score: 71,
-  items: [
-    {
-      type: "positive",
-      text: "Highlights core tech stack, including React, JavaScript, TypeScript, Redux, and AI skills.",
-      scoreImpact: 3,
-    },
-    {
-      type: "negative",
-      text: 'Lacks specific skill endorsements (e.g., "React.js", "Project Management") and strategic skills like UI/UX or team leadership.',
-      scoreImpact: 2,
-    },
-    {
-      type: "suggestion",
-      text: "Add 5-7 targeted skills especially in UI/UX (e.g., User-Centered Design), Cloud (AWS/Azure), Project Management, and Data Visualization. Also, reorder skills to emphasize top proficiency areas.",
-    },
-    {
-      type: "suggestion",
-      text: "improve keyword match",
-      scoreImpact: 3,
-    },
-  ],
-  suggestions: [],
-});
+const scoreSkills = (skills: string[], targetRole: string): ScoreResult => {
+  const roleLabel = targetRole || "your target role";
+  const rewrite = buildSkillsRewrite(roleLabel);
+  return {
+    score: 71,
+    items: [
+      ...(skills.length
+        ? [
+            {
+              type: "positive" as const,
+              text: "Skills section is present.",
+              scoreImpact: 3,
+            },
+          ]
+        : []),
+      {
+        type: "negative",
+        text: `Skills are not clearly tailored to ${roleLabel}.`,
+        scoreImpact: 2,
+      },
+      {
+        type: "suggestion",
+        text: rewrite,
+      },
+      {
+        type: "suggestion",
+        text: `Add 8-12 role-specific skills aligned with ${roleLabel}.`,
+        scoreImpact: 3,
+      },
+    ],
+    suggestions: [],
+  };
+};
 
-const scoreEngagement = (): ScoreResult => ({
-  score: 68,
-  items: [
-    {
-      type: "positive",
-      text: "Has a creator badge, indicating content creation.",
-      scoreImpact: 2,
-    },
-    {
-      type: "negative",
-      text: "Limited activity or engagement data provided (e.g., posts, articles, comments).",
-      scoreImpact: 1,
-    },
-    {
-      type: "suggestion",
-      text: "Increase activity by sharing case studies, AI insights, or project updates weekly. Engage with relevant groups and comment on industry discussions.",
-    },
-    {
-      type: "suggestion",
-      text: "boost visibility and recruiter interaction",
-      scoreImpact: 3,
-    },
-  ],
-  suggestions: [],
-});
+const scoreEngagement = (targetRole: string): ScoreResult => {
+  const roleLabel = targetRole || "your target role";
+  return {
+    score: 68,
+    items: [
+      {
+        type: "negative",
+        text: "Limited activity or engagement evidence provided.",
+        scoreImpact: 1,
+      },
+      {
+        type: "suggestion",
+        text: `Post or share content related to ${roleLabel} to build credibility and visibility.`,
+      },
+      {
+        type: "suggestion",
+        text: "Engage weekly with relevant groups, comments, and industry discussions.",
+        scoreImpact: 3,
+      },
+    ],
+    suggestions: [],
+  };
+};
 
-const buildBenchmarkSection = (summary: string, experience: string, skills: string[]) => {
+const buildBenchmarkSection = (
+  summary: string,
+  experience: string,
+  skills: string[],
+  targetRole: string
+) => {
+  const roleLabel = targetRole || "your target role";
   return {
     title: "Benchmarking",
     icon: "BM",
@@ -369,6 +412,11 @@ const buildBenchmarkSection = (summary: string, experience: string, skills: stri
         type: skills.length >= 12 && skills.length <= 30 ? "positive" : "negative",
         text: `Skills benchmark: 12-30 skills. Current: ${skills.length}.`,
         scoreImpact: 3,
+      },
+      {
+        type: "suggestion",
+        text: `Ensure the top skills directly map to ${roleLabel} requirements.`,
+        scoreImpact: 2,
       },
     ],
   } satisfies AnalysisSection;
@@ -434,42 +482,38 @@ export default async function handler(
     });
   }
 
-  const keywords = [
-    ...DEFAULT_KEYWORDS,
-    ...skills,
-    ...splitKeywords(input.targetKeywords),
-  ].filter(Boolean);
+  const roleKeywords = normalizeRoleKeywords(input.targetRole);
 
-  const headlineResult = scoreHeadline();
-  const summaryResult = scoreSummary();
-  const experienceResult = scoreExperience();
-  const skillsResult = scoreSkills();
-  const engagementResult = scoreEngagement();
+  const headlineResult = scoreHeadline(headline, input.targetRole ?? "", roleKeywords, skills);
+  const summaryResult = scoreSummary(summary, input.targetRole ?? "", roleKeywords, skills);
+  const experienceResult = scoreExperience(experience, input.targetRole ?? "");
+  const skillsResult = scoreSkills(skills, input.targetRole ?? "");
+  const engagementResult = scoreEngagement(input.targetRole ?? "");
 
   const suggestions: AnalysisItem[] = [
     {
       type: "suggestion",
-      text: 'Optimize your headline with targeted keywords like "Senior Frontend Developer," "UI/UX Designer," or "AI Solutions Architect" to match job roles recruiters search for.',
+      text: `Optimize your headline with ${input.targetRole || "target role"} keywords to match recruiter searches.`,
       scoreImpact: 4,
     },
     {
       type: "suggestion",
-      text: "Update your About section with quantifiable achievements and specific projects that demonstrate impact, especially in client solutions and team leadership.",
+      text: "Update your About section with quantifiable achievements and role-relevant responsibilities.",
       scoreImpact: 4,
     },
     {
       type: "suggestion",
-      text: "Add recent activity such as articles, project showcases, or industry commentary to boost visibility and engagement.",
+      text: `Add recent activity that signals expertise in ${input.targetRole || "your target role"}.`,
       scoreImpact: 3,
     },
     {
       type: "suggestion",
-      text: "Enhance skills section by endorsing key skills, adding missing strategic skills, and organizing for clarity.",
+      text: "Enhance skills section by adding missing role-specific skills and organizing for clarity.",
       scoreImpact: 3,
     },
     {
       type: "suggestion",
-      text: "Include measurable outcomes in experience entries to demonstrate tangible results and value added.",
+      text: "Include measurable outcomes in experience entries to demonstrate impact relevant to the target role.",
       scoreImpact: 4,
     },
   ];
@@ -480,7 +524,7 @@ export default async function handler(
     { title: "Experience", icon: "EXP", color: "blue", items: experienceResult.items },
     { title: "Skills", icon: "SK", color: "green", items: skillsResult.items },
     { title: "Activity & Engagement", icon: "ENG", color: "purple", items: engagementResult.items },
-    buildBenchmarkSection(summary, experience, skills),
+    buildBenchmarkSection(summary, experience, skills, input.targetRole ?? ""),
     {
       title: "Final Suggestions",
       icon: "TIP",

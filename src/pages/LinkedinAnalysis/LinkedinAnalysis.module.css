@@ -193,7 +193,7 @@
 }
 
 .cardList {
-  margin: 0;
+  margin: 8px 0;
   padding-left: 18px;
   line-height: 1.6;
   font-size: var(--base-font-size);
@@ -262,8 +262,7 @@
 .scoreDescription {
   font-size: var(--base-font-size);
   line-height: 1.5;
-  margin: 0;
-  color: #475569;
+  color: var(--color-text);
 }
 
 .improvementBtn {
@@ -498,10 +497,10 @@
 }
 
 .suggestion {
-  background: #ffffff;
+  background: var(--color-white);
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-gray);
   margin-top: 6px;
 }
 

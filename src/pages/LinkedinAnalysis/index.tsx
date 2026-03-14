@@ -39,6 +39,26 @@ type AnalysisResult = {
     aiScore: number;
     scoreRationale: string;
     recommendations: string[];
+    alignmentSummary?: {
+      fitSummary?: string;
+      strengths?: string[];
+      gaps?: string[];
+      priorityFixes?: string[];
+    };
+    replacementMap?: {
+      section:
+        | "Headline"
+        | "About"
+        | "Experience"
+        | "Skills"
+        | "Activity"
+        | "Benchmarking"
+        | "Final Suggestions"
+        | "General";
+      replace: string;
+      with: string;
+      rationale?: string;
+    }[];
     modifications: {
       headline?: string;
       about?: string;
@@ -76,10 +96,9 @@ const formatScoreImpact = (value?: number) =>
   typeof value === "number" ? `(+${value} score)` : "";
 
 const toDisplayScore = (aiScore?: number) => {
-  if (typeof aiScore !== "number") return { score: 0, max: 80 };
-  const scaled = (aiScore / 100) * 80;
-  const rounded = Math.round(scaled * 10) / 10;
-  return { score: rounded, max: 80 };
+  if (typeof aiScore !== "number") return { score: 0, max: 100 };
+  const rounded = Math.round(aiScore * 10) / 10;
+  return { score: rounded, max: 100 };
 };
 
 const sectionIconLabel = (title: string, fallback: string) => {
@@ -190,6 +209,18 @@ export default function LinkedinAnalysis() {
     return hasContent ? modifications : null;
   };
 
+  const normalizeSectionKey = (title: string) => {
+    const key = title.toLowerCase();
+    if (key.includes("headline")) return "Headline";
+    if (key.includes("summary") || key.includes("about")) return "About";
+    if (key.includes("experience")) return "Experience";
+    if (key.includes("skills")) return "Skills";
+    if (key.includes("activity") || key.includes("engagement")) return "Activity";
+    if (key.includes("benchmark")) return "Benchmarking";
+    if (key.includes("final")) return "Final Suggestions";
+    return "General";
+  };
+
   useEffect(() => {
     const session = getSession();
     if (!session?.email) {
@@ -278,7 +309,7 @@ export default function LinkedinAnalysis() {
         const response = await fetch("/api/linkedinAnalysis", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profileUrl: linkedinUrl }),
+          body: JSON.stringify({ profileUrl: linkedinUrl, targetRole }),
         });
         const baseData = (await response.json()) as
           | (Omit<AnalysisResult, "profileScore" | "aiAnalysis"> & { message?: string })
@@ -306,6 +337,26 @@ export default function LinkedinAnalysis() {
           aiScore?: number;
           scoreRationale?: string;
           recommendations?: string[];
+          alignmentSummary?: {
+            fitSummary?: string;
+            strengths?: string[];
+            gaps?: string[];
+            priorityFixes?: string[];
+          };
+          replacementMap?: {
+            section:
+              | "Headline"
+              | "About"
+              | "Experience"
+              | "Skills"
+              | "Activity"
+              | "Benchmarking"
+              | "Final Suggestions"
+              | "General";
+            replace: string;
+            with: string;
+            rationale?: string;
+          }[];
           modifications?: {
             headline?: string;
             about?: string;
@@ -333,6 +384,13 @@ export default function LinkedinAnalysis() {
             aiScore: aiData.aiScore ?? 0,
             scoreRationale: aiData.scoreRationale ?? "",
             recommendations: aiData.recommendations ?? [],
+            alignmentSummary: aiData.alignmentSummary ?? {
+              fitSummary: "",
+              strengths: [],
+              gaps: [],
+              priorityFixes: [],
+            },
+            replacementMap: aiData.replacementMap ?? [],
             modifications: aiData.modifications ?? {},
             suggestedKeywords: aiData.suggestedKeywords ?? [],
             analysisText: aiData.analysisText ?? "",
@@ -481,6 +539,48 @@ export default function LinkedinAnalysis() {
               </div>
             </div>
 
+            {analysisResult.aiAnalysis?.alignmentSummary && (
+              <div className={styles.actionSection}>
+                <h2>Target Role Alignment</h2>
+                {analysisResult.aiAnalysis.alignmentSummary.fitSummary ? (
+                  <p className={styles.scoreDescription}>
+                    {analysisResult.aiAnalysis.alignmentSummary.fitSummary}
+                  </p>
+                ) : null}
+                {analysisResult.aiAnalysis.alignmentSummary.strengths?.length ? (
+                  <>
+                    <h3>Strengths to Highlight</h3>
+                    <ul className={styles.cardList}>
+                      {analysisResult.aiAnalysis.alignmentSummary.strengths.map((item, idx) => (
+                        <li key={`strength-${idx}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                {analysisResult.aiAnalysis.alignmentSummary.gaps?.length ? (
+                  <>
+                    <h3>Gaps to Fix</h3>
+                    <ul className={styles.cardList}>
+                      {analysisResult.aiAnalysis.alignmentSummary.gaps.map((item, idx) => (
+                        <li key={`gap-${idx}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                {analysisResult.aiAnalysis.alignmentSummary.priorityFixes?.length ? (
+                  <>
+                    <h3>Priority Fixes</h3>
+                    <ul className={styles.cardList}>
+                      {analysisResult.aiAnalysis.alignmentSummary.priorityFixes.map(
+                        (item, idx) => (
+                          <li key={`fix-${idx}`}>{item}</li>
+                        )
+                      )}
+                    </ul>
+                  </>
+                ) : null}
+              </div>
+            )}
             <div className={styles.analysisGrid}>
               {analysisResult.sections.map((section) => (
                 <div
@@ -516,6 +616,28 @@ export default function LinkedinAnalysis() {
                         </div>
                       );
                     })}
+                    {analysisResult.aiAnalysis?.replacementMap?.length ? (
+                      (() => {
+                        const sectionKey = normalizeSectionKey(section.title);
+                        const replacements = analysisResult.aiAnalysis?.replacementMap?.filter(
+                          (item) => item.section === sectionKey
+                        );
+                        if (!replacements || replacements.length === 0) return null;
+                        return (
+                          <div className={styles.suggestion}>
+                            <strong>Replace / With</strong>
+                            <ul className={styles.cardList}>
+                              {replacements.map((item, idx) => (
+                                <li key={`${section.title}-replace-${idx}`}>
+                                  Replace "{item.replace}" with "{item.with}"
+                                  {item.rationale ? ` - ${item.rationale}` : ""}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -584,6 +706,7 @@ export default function LinkedinAnalysis() {
     </Layout>
   );
 }
+
 
 
 

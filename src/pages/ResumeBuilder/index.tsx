@@ -138,6 +138,7 @@ export default function ResumeBuilder() {
   const [skillRating, setSkillRating] = useState(3);
   const [languageInput, setLanguageInput] = useState("");
   const previewRef = useRef<HTMLDivElement>(null);
+  const previewHeaderRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<"upload" | "manual">("upload");
   const [previewTemplate, setPreviewTemplate] = useState<"navy" | "clean" | "slate">("navy");
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -153,6 +154,13 @@ export default function ResumeBuilder() {
   const { withLoader } = useLoader();
   const aiResultRef = useRef<HTMLDivElement>(null);
   const hasHydratedResume = useRef(false);
+
+  const scrollToPreviewHeader = () => {
+    previewHeaderRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
 
   useEffect(() => {
     if (aiResult && aiResultRef.current) {
@@ -1172,70 +1180,72 @@ export default function ResumeBuilder() {
 
 
                 {aiResult && (
+                  <>
+                  <h2 className={styles.aiResumeTitle}>AI Feedback based on target role</h2>
                   <div ref={aiResultRef} className={styles.aiCard}>
-                    <div className={styles.aiHeader}>
-                      <h3 className={styles.sectionTitle}>✨ AI Resume Review</h3>
-                      <span className={styles.aiScore}>⭐ {aiResult.score}/100</span>
-                    </div>
-                    <p className={styles.aiSummary}>{aiResult.summary}</p>
-                    {!!aiResult.strengths.length && (
-                      <div className={styles.aiBlock}>
-                        <h4>✅ Strengths</h4>
-                        <ul>
-                          {aiResult.strengths.map((item, idx) => (
-                            <li key={idx}>{renderAiItem(item)}</li>
-                          ))}
-                        </ul>
+                      <div className={styles.aiHeader}>
+                        <h3 className={styles.sectionTitle}>✨ AI Resume Review</h3>
+                        <span className={styles.aiScore}>⭐ {aiResult.score}/100</span>
                       </div>
-                    )}
-                    {!!aiResult.improvements.length && (
-                      <div className={styles.aiBlock}>
-                        <h4>🛠️ Improvements</h4>
-                        <ul>
-                          {aiResult.improvements.map((item, idx) => (
-                            <li key={idx}>{renderAiItem(item)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {!!aiResult.suggestions.length && (
-                      <div className={styles.aiBlock}>
-                        <h4>💡 Suggestions</h4>
-                        <ul>
-                          {aiResult.suggestions.map((item, idx) => (
-                            <li key={idx}>{renderAiItem(item)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {aiResult.rewriteSummary && (
-                      <div className={styles.aiBlock}>
-                        <h4>📝 Suggested Summary</h4>
-                        <p>{aiResult.rewriteSummary}</p>
-                      </div>
-                    )}
-                    {!!aiResult.keywords.length && (
-                      <div className={styles.aiBlock}>
-                        <h4>🏷️ Suggested Keywords</h4>
-                        <div className={styles.keywordList}>
-                          {aiResult.keywords.map((item, idx) => (
-                            <span key={idx} className={styles.keywordTag}>
-                              {renderAiItem(item)}
-                            </span>
-                          ))}
+                      <p className={styles.aiSummary}>{aiResult.summary}</p>
+                      {!!aiResult.strengths.length && (
+                        <div className={styles.aiBlock}>
+                          <h4>✅ Strengths</h4>
+                          <ul>
+                            {aiResult.strengths.map((item, idx) => (
+                              <li key={idx}>{renderAiItem(item)}</li>
+                            ))}
+                          </ul>
                         </div>
+                      )}
+                      {!!aiResult.improvements.length && (
+                        <div className={styles.aiBlock}>
+                          <h4>🛠️ Improvements</h4>
+                          <ul>
+                            {aiResult.improvements.map((item, idx) => (
+                              <li key={idx}>{renderAiItem(item)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {!!aiResult.suggestions.length && (
+                        <div className={styles.aiBlock}>
+                          <h4>💡 Suggestions</h4>
+                          <ul>
+                            {aiResult.suggestions.map((item, idx) => (
+                              <li key={idx}>{renderAiItem(item)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {aiResult.rewriteSummary && (
+                        <div className={styles.aiBlock}>
+                          <h4>📝 Suggested Summary</h4>
+                          <p>{aiResult.rewriteSummary}</p>
+                        </div>
+                      )}
+                      {!!aiResult.keywords.length && (
+                        <div className={styles.aiBlock}>
+                          <h4>🏷️ Suggested Keywords</h4>
+                          <div className={styles.keywordList}>
+                            {aiResult.keywords.map((item, idx) => (
+                              <span key={idx} className={styles.keywordTag}>
+                                {renderAiItem(item)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className={styles.aiBlock}>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => setActiveTab("manual")}
+                        >
+                          Edit Resume
+                        </button>
                       </div>
-                    )}
-                    <div className={styles.aiBlock}>
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        onClick={() => setActiveTab("manual")}
-                      >
-                        Edit Resume
-                      </button>
-                    </div>
-                  </div>
+                    </div></>
                 )}
               </>
             )}
@@ -1432,7 +1442,7 @@ export default function ResumeBuilder() {
                   <summary className={styles.accordionHeader}>Experience</summary>
                   <div className={styles.accordionBody}>
                     <div className="form-group">
-                      <label >Experiences</label>
+                      <label>Experiences</label>
                       {form.experiences.map((exp, idx) => (
                         <div key={idx} className={styles.card} style={{ padding: 12, marginBottom: 8 }}>
                           <div className={styles.formGrid}>
@@ -1541,13 +1551,34 @@ export default function ResumeBuilder() {
                     </div>
                   </div>
                 </details>
+        <div className={`${styles.downloadActions} ${styles.noPrint}`}>
+          <button
+            type="button"
+            className={`btn-primary ${styles.tabButton}`}
+            onClick={() => {
+              scrollToPreviewHeader();
+            }}
+          >
+            Review Resume
+          </button>
+          <button
+            type="button"
+            className={`btn-primary ${styles.downloadResume}`}
+            title="Save and Download PDF"
+            onClick={saveDownloadResume}
+            disabled={isSaving}
+            aria-busy={isSaving}
+          >
+            {isSaving ? "Saving..." : "Save and Download"}
+          </button>
+        </div>
 
               </>
             )}
           </div>
 
           <div className={`${styles.card} ${styles.previewCard} ${styles.printArea}`}>
-            <div className={styles.previewHeader}>
+            <div ref={previewHeaderRef} className={styles.previewHeader}>
               <h3 className={styles.sectionTitle}>Preview</h3>
               <div className={styles.previewActions}>
                 <button
@@ -1656,6 +1687,9 @@ export default function ResumeBuilder() {
                 onClick={() => {
                   setActiveTab("manual");
                   setManualMode("edit");
+                  if (typeof window !== "undefined") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
                 }}
               >
                 ✏️ Edit Resume
