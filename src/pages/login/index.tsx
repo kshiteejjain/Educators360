@@ -48,6 +48,7 @@ export default function Login() {
             userId?: string;
             subject?: string;
             resume?: Record<string, unknown>;
+            targetRole?: string;
           };
         };
 
@@ -65,6 +66,7 @@ export default function Login() {
               role: authenticatedUser?.role,
               subject: authenticatedUser?.subject,
               userId: authenticatedUser?.userId,
+              targetRole: authenticatedUser?.targetRole,
             };
             window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(payload));
           } catch (err) {

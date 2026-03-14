@@ -69,11 +69,12 @@
 .backButton {
   border: 1px solid #cbd5f5;
   background: #eef2ff;
-  color: #1d4ed8;
+  color: var(--color-primary);
   padding: 8px 14px;
   border-radius: 999px;
   cursor: pointer;
   font-weight: 600;
+  margin-left: 15px;
 }
 
 .backButton:hover {
@@ -135,6 +136,10 @@
   margin: 0 0 4px;
 }
 
+.answerInputWrapper {
+  position: relative;
+}
+
 .answerInput {
   width: 100%;
   border: 1px solid #cbd5f5;
@@ -143,6 +148,99 @@
   font-size: 14px;
   resize: vertical;
   min-height: 120px;
+  transition: border-color 0.2s;
+}
+
+.answerInputRecording {
+  border-style: dashed;
+  border-color: #7c3aed;
+  animation: recordingGlow 1.2s infinite ease-in-out;
+}
+
+@keyframes recordingGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(124, 58, 237, 0);
+  }
+}
+
+.recordButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1d4ed8;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.recordButton:hover {
+  background: rgba(239, 246, 255, 0.95);
+  transform: translateY(-1px);
+}
+
+.recordButtonActive {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.micButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1d4ed8;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.micButton:hover {
+  background: rgba(239, 246, 255, 0.95);
+  transform: translateY(-1px);
+}
+
+.micButtonActive {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.speechHint {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.speechError {
+  margin: 0 0 12px;
+  color: var(--color-error);
+  background: rgba(255, 238, 238, 0.8);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.wordCount {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+  text-align: right;
 }
 
 .submitRow {

@@ -74,7 +74,15 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           <Image src="/logo-collapsed.svg" alt="Logo" width={48} height={48} priority className={styles.collapsedLogo} />
         }
       </div>
-      {isCollapsed ? <Tooltip id={logoTooltipId} /> : null}
+      {isCollapsed ? (
+        <Tooltip
+          id={logoTooltipId}
+          className={styles.sidebarTooltip}
+          place="right"
+          offset={12}
+          positionStrategy="fixed"
+        />
+      ) : null}
 
       <button
         type="button"
@@ -121,7 +129,15 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           );
         })}
       </ul>
-      {isCollapsed ? <Tooltip id={menuTooltipId} place="right" /> : null}
+      {isCollapsed ? (
+        <Tooltip
+          id={menuTooltipId}
+          className={styles.sidebarTooltip}
+          place="right"
+          offset={12}
+          positionStrategy="fixed"
+        />
+      ) : null}
     </aside>
   );
 }

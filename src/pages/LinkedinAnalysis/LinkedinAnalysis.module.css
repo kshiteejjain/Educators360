@@ -124,6 +124,12 @@
   animation: fadeIn 0.4s ease;
 }
 
+.resultsActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

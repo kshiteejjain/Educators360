@@ -6,7 +6,7 @@ import styles from "./ResumeBuilder.module.css";
 import { useLoader } from "@/components/Loader/LoaderProvider";
 import { getSession } from "@/utils/authSession";
 import { getDb } from "@/utils/firebase";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import placeholderTeacher from "../../../public/placeholder-teacher.jpg";
 import morden from "../../../public/morden.png";
@@ -154,6 +154,7 @@ export default function ResumeBuilder() {
   const { withLoader } = useLoader();
   const aiResultRef = useRef<HTMLDivElement>(null);
   const hasHydratedResume = useRef(false);
+  const hasHydratedTargetRole = useRef(false);
 
   const scrollToPreviewHeader = () => {
     previewHeaderRef.current?.scrollIntoView({
@@ -241,9 +242,48 @@ export default function ResumeBuilder() {
       if (preview === "navy" || preview === "clean" || preview === "slate") {
         setPreviewTemplate(preview);
       }
+
+      const storedTargetRole =
+        typeof cached?.targetRole === "string" ? cached.targetRole.trim() : "";
+      if (storedTargetRole) {
+        setTargetJob(storedTargetRole);
+      }
     } catch (error) {
       console.warn("Failed to hydrate resume from local storage", error);
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || hasHydratedTargetRole.current) return;
+    const session = getSession();
+    if (!session?.email) return;
+    hasHydratedTargetRole.current = true;
+
+    const hydrateTargetRole = async () => {
+      try {
+        const db = getDb();
+        const userRef = doc(db, "upEducatePlusUsers", session.email.toLowerCase());
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) return;
+        const data = snap.data() as { targetRole?: unknown };
+        const nextTargetRole =
+          typeof data?.targetRole === "string" ? data.targetRole.trim() : "";
+        if (!nextTargetRole) return;
+        setTargetJob(nextTargetRole);
+        try {
+          const raw = window.localStorage.getItem("upeducateJobPrefix");
+          const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+          const next = { ...existing, targetRole: nextTargetRole };
+          window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(next));
+        } catch (error) {
+          console.warn("Failed to store target role from firestore", error);
+        }
+      } catch (error) {
+        console.warn("Failed to hydrate target role from firestore", error);
+      }
+    };
+
+    void hydrateTargetRole();
   }, []);
 
   useEffect(() => {
@@ -257,6 +297,24 @@ export default function ResumeBuilder() {
     } catch (error) {
       console.warn("Failed to store target role", error);
     }
+
+    const session = getSession();
+    if (!session?.email) return;
+    const persistTargetRole = async () => {
+      try {
+        const db = getDb();
+        const userRef = doc(db, "upEducatePlusUsers", session.email.toLowerCase());
+        await setDoc(
+          userRef,
+          { targetRole: trimmed, targetRoleUpdatedAt: serverTimestamp() },
+          { merge: true }
+        );
+      } catch (error) {
+        console.warn("Failed to store target role in firestore", error);
+      }
+    };
+
+    void persistTargetRole();
   }, [targetJob]);
 
   const loadTemplate = (id: string) => {
@@ -643,12 +701,7 @@ export default function ResumeBuilder() {
     const isDoc = name.endsWith(".doc") || file.type === "application/msword";
 
     if (!isPdf && !isDocx && !isDoc) {
-      setUploadError("Only PDF or Word (.docx) files are supported.");
-      return;
-    }
-
-    if (isDoc) {
-      setUploadError("Please upload a .docx file (legacy .doc is not supported).");
+      setUploadError("Only PDF or Word (.doc, .docx) files are supported.");
       return;
     }
 
@@ -658,7 +711,7 @@ export default function ResumeBuilder() {
       text = isPdf ? await extractTextFromPdf(file) : await extractTextFromDocx(file);
       if (!text || text.replace(/\s/g, "").length < 50) {
         setUploadError(
-          "No extractable text found. Please upload a text-based PDF or a DOCX file."
+          "No extractable text found. Please upload a text-based PDF or a Word file (.doc, .docx)."
         );
         return;
       }
@@ -1119,7 +1172,8 @@ export default function ResumeBuilder() {
                     <h3 className={styles.sectionTitle}>Upload your CV</h3>
                   </div>
                   <p className={styles.uploadHint}>
-                    Upload a PDF or DOCX. We will extract the text before sending it to AI.
+                    Upload a PDF or Word document (.doc, .docx). We will extract the text before
+                    sending it to AI.
                   </p>
                   <div className="form-group">
                     <label htmlFor="target-job">Target Role or Job Description *</label>

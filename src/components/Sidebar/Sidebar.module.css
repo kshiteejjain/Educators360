@@ -2,6 +2,7 @@
   background: var(--color-white);
   width: 260px;
   height: 100vh;
+  overflow-y: auto;
   border-right: 1px solid var(--color-e5e7eb);
   box-shadow: 2px 0 8px var(--color-rgba-0-0-0-003);
   padding: 0 15px;
@@ -148,6 +149,14 @@
 
 .collapsed .logo {
   padding: 10px;
+}
+
+.sidebarTooltip {
+  z-index: 30;
+  pointer-events: none;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
 }
 
 /* Active fix cleanup */

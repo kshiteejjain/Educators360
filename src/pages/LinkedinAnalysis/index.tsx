@@ -181,6 +181,162 @@ const buildCvText = (resumeData: Record<string, unknown>) => {
   return lines.join("\n");
 };
 
+const normalizeSectionKey = (title: string) => {
+  const key = title.toLowerCase();
+  if (key.includes("headline")) return "Headline";
+  if (key.includes("summary") || key.includes("about")) return "About";
+  if (key.includes("experience")) return "Experience";
+  if (key.includes("skills")) return "Skills";
+  if (key.includes("activity") || key.includes("engagement")) return "Activity";
+  if (key.includes("benchmark")) return "Benchmarking";
+  if (key.includes("final")) return "Final Suggestions";
+  return "General";
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+const buildLinkedinReportHtml = (
+  result: AnalysisResult,
+  targetRoleValue: string
+) => {
+  const inline = (value: string) => escapeHtml(value || "");
+  const score = toDisplayScore(result.aiAnalysis?.aiScore);
+  const alignment = result.aiAnalysis?.alignmentSummary;
+
+  const renderList = (items?: string[]) =>
+    items && items.length
+      ? `<ul>${items.map((item) => `<li>${inline(item)}</li>`).join("")}</ul>`
+      : "";
+
+  const sectionsHtml = result.sections
+    .map((section) => {
+      const itemsHtml = section.items
+        .map((item) => {
+          const scoreTag = item.scoreImpact ? ` (+${item.scoreImpact} score)` : "";
+          const suggestion = item.suggestion
+            ? `<div><strong>Replace / Action Plan</strong><p>${inline(
+                item.suggestion
+              )}</p></div>`
+            : "";
+          return `<div>
+              <p><strong>${inline(item.text)}</strong>${inline(scoreTag)}</p>
+              ${suggestion}
+            </div>`;
+        })
+        .join("");
+
+      const sectionKey = normalizeSectionKey(section.title);
+      const replacements =
+        result.aiAnalysis?.replacementMap?.filter((item) => item.section === sectionKey) ?? [];
+      const replaceHtml =
+        replacements.length > 0
+          ? `<div>
+              <strong>Replace / With</strong>
+              <ul>
+                ${replacements
+                  .map(
+                    (item) =>
+                      `<li>Replace "${inline(item.replace)}" with "${inline(item.with)}"${
+                        item.rationale ? ` - ${inline(item.rationale)}` : ""
+                      }</li>`
+                  )
+                  .join("")}
+              </ul>
+            </div>`
+          : "";
+
+      return `
+        <section>
+          <h2>${inline(section.title)}</h2>
+          ${itemsHtml}
+          ${replaceHtml}
+        </section>
+      `;
+    })
+    .join("");
+
+  const aiMods = result.aiAnalysis?.modifications;
+  const aiModsHtml = aiMods
+    ? `
+      <section>
+        <h2>AI Recommended Changes</h2>
+        ${aiMods.headline ? `<h3>Headline Rewrite</h3><p>${inline(aiMods.headline)}</p>` : ""}
+        ${aiMods.about ? `<h3>About Section</h3><p>${inline(aiMods.about)}</p>` : ""}
+        ${
+          aiMods.experienceBullets?.length
+            ? `<h3>Experience Bullet Upgrades</h3>${renderList(
+                aiMods.experienceBullets
+              )}`
+            : ""
+        }
+        ${
+          aiMods.skills?.length
+            ? `<h3>Skill Additions</h3><p>${inline(aiMods.skills.join(", "))}</p>`
+            : ""
+        }
+      </section>
+    `
+    : "";
+
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; line-height: 1.6; }
+          h1 { font-size: 22px; margin: 0 0 12px; }
+          h2 { font-size: 18px; margin: 16px 0 8px; }
+          h3 { font-size: 15px; margin: 12px 0 6px; }
+          p { margin: 0 0 8px; }
+          ul { margin: 0 0 10px 16px; padding: 0; }
+          li { margin: 0 0 6px; }
+        </style>
+      </head>
+      <body>
+        <h1>LinkedIn Profile Analysis</h1>
+        <p><strong>Target Role:</strong> ${inline(targetRoleValue)}</p>
+        <p><strong>Profile Score:</strong> ${inline(
+          String(score.score)
+        )} / ${inline(String(score.max))}</p>
+        <p>${inline(
+          result.aiAnalysis?.scoreRationale ||
+            "We analyzed your LinkedIn profile for clarity, impact, and recruiter relevance."
+        )}</p>
+        ${
+          alignment
+            ? `
+          <section>
+            <h2>Target Role Alignment</h2>
+            ${alignment.fitSummary ? `<p>${inline(alignment.fitSummary)}</p>` : ""}
+            ${alignment.strengths?.length ? `<h3>Strengths to Highlight</h3>${renderList(alignment.strengths)}` : ""}
+            ${alignment.gaps?.length ? `<h3>Gaps to Fix</h3>${renderList(alignment.gaps)}` : ""}
+            ${
+              alignment.priorityFixes?.length
+                ? `<h3>Priority Fixes</h3>${renderList(alignment.priorityFixes)}`
+                : ""
+            }
+          </section>
+        `
+            : ""
+        }
+        ${sectionsHtml}
+        ${aiModsHtml}
+        ${
+          result.aiAnalysis?.recommendations?.length
+            ? `<section><h2>Final Suggestions</h2>${renderList(
+                result.aiAnalysis.recommendations
+              )}</section>`
+            : ""
+        }
+      </body>
+    </html>
+  `;
+};
+
 export default function LinkedinAnalysis() {
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [targetRole, setTargetRole] = useState("");
@@ -207,18 +363,6 @@ export default function LinkedinAnalysis() {
       Boolean(modifications.experienceBullets?.length) ||
       Boolean(modifications.skills?.length);
     return hasContent ? modifications : null;
-  };
-
-  const normalizeSectionKey = (title: string) => {
-    const key = title.toLowerCase();
-    if (key.includes("headline")) return "Headline";
-    if (key.includes("summary") || key.includes("about")) return "About";
-    if (key.includes("experience")) return "Experience";
-    if (key.includes("skills")) return "Skills";
-    if (key.includes("activity") || key.includes("engagement")) return "Activity";
-    if (key.includes("benchmark")) return "Benchmarking";
-    if (key.includes("final")) return "Final Suggestions";
-    return "General";
   };
 
   useEffect(() => {
@@ -415,6 +559,17 @@ export default function LinkedinAnalysis() {
   };
 
   const aiModifications = getAiModifications();
+  const downloadReportAsWord = () => {
+    if (!analysisResult) return;
+    const htmlContent = buildLinkedinReportHtml(analysisResult, targetRole.trim());
+    const blob = new Blob([htmlContent], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "linkedin-profile-analysis.doc";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <Layout>
@@ -515,6 +670,8 @@ export default function LinkedinAnalysis() {
         {/* Analysis Results */}
         {analysisResult && (
           <div className={styles.resultsSection}>
+            <div className={styles.resultsActions}>
+            </div>
             <div className={styles.scoreCard}>
               <div className={styles.scoreDisplay}>
                 <div className={styles.scoreCircle} style={{ borderColor: "#0a66c2" }}>
@@ -700,14 +857,16 @@ export default function LinkedinAnalysis() {
                 </ul>
               </div>
             ) : null}
+            <p><strong>Note:</strong> Download the AI report to access all recommendations and preserve your credits.</p>
+            <button type="button" className="btn-primary" onClick={downloadReportAsWord}>
+                Download AI Report
+              </button>
           </div>
         )}
       </div>
     </Layout>
   );
 }
-
-
 
 
 

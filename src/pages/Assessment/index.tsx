@@ -169,7 +169,8 @@ const renderInline = (value: string) =>
   );
 
 const renderRichText = (value: string) => {
-  const lines = value
+  const normalizedValue = value.replace(/([^\n])\s*(#{1,6}\s+)/g, "$1\n$2");
+  const lines = normalizedValue
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -202,9 +203,9 @@ const renderRichText = (value: string) => {
     if (headingMatch) {
       flushList();
       blocks.push(
-        <div key={`h-${index}`} className={styles.richHeading}>
+        <h4 key={`h-${index}`} className={styles.richHeading}>
           {renderInline(headingMatch[1])}
-        </div>
+        </h4>
       );
       return;
     }
@@ -406,6 +407,24 @@ const renderReport = (text: string) => {
   const parsed = parseReportSections(text);
   if (!parsed.sections.length) return null;
 
+  const renderReportLine = (line: string, key: string) => {
+    const trimmed = line.trim();
+    const headingMatch = trimmed.match(/^#{1,6}\s+(.*)$/);
+    if (headingMatch) {
+      return (
+        <h4 key={key} className={styles.reportH4}>
+          {renderInline(headingMatch[1])}
+        </h4>
+      );
+    }
+
+    return (
+      <p key={key} className={styles.reportParagraph}>
+        {renderInline(trimmed.replace(/^[-â€¢]\s*/, ""))}
+      </p>
+    );
+  };
+
   return (
     <div className={styles.reportLayout}>
       <div className={styles.reportHero}>
@@ -446,11 +465,9 @@ const renderReport = (text: string) => {
                 ) : (
                   <p className={styles.reportParagraph}>No score data available.</p>
                 )}
-                {scorecardParagraphs.map((line, pIndex) => (
-                  <p key={`p-score-${index}-${pIndex}`} className={styles.reportParagraph}>
-                    {renderInline(line.replace(/^[-•]\s*/, ""))}
-                  </p>
-                ))}
+                {scorecardParagraphs.map((line, pIndex) =>
+                  renderReportLine(line, `p-score-${index}-${pIndex}`)
+                )}
                 {scorecardBullets.length > 0 && (
                   <ul className={styles.reportList}>
                     {scorecardBullets.map((line, bIndex) => (
@@ -484,11 +501,9 @@ const renderReport = (text: string) => {
                   {renderInline(section.title)}
                 </h3>
               </div>
-              {paragraphs.map((line, pIndex) => (
-                <p key={`p-${index}-${pIndex}`} className={styles.reportParagraph}>
-                  {renderInline(line.replace(/^[-•]\s*/, ""))}
-                </p>
-              ))}
+              {paragraphs.map((line, pIndex) =>
+                renderReportLine(line, `p-${index}-${pIndex}`)
+              )}
               {bullets.length > 0 && (
                 <ul className={styles.reportList}>
                   {bullets.map((line, bIndex) => (
@@ -509,6 +524,92 @@ const renderReport = (text: string) => {
   );
 };
 
+const inlineToHtml = (value: string) =>
+  value.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+const buildReportHtml = (text: string) => {
+  const parsed = parseReportSections(text);
+  if (!parsed.sections.length) return "";
+
+  const renderLine = (line: string) => {
+    const trimmed = line.trim();
+    const headingMatch = trimmed.match(/^#{1,6}\s+(.*)$/);
+    if (headingMatch) {
+      return `<h4>${inlineToHtml(headingMatch[1])}</h4>`;
+    }
+    return `<p>${inlineToHtml(trimmed.replace(/^[-•]\s*/, ""))}</p>`;
+  };
+
+  const sectionsHtml = parsed.sections
+    .map((section) => {
+      const scoreLines = extractScoreLines(section.lines);
+      const isScorecard =
+        section.title.toLowerCase().includes("scorecard") || scoreLines.length > 0;
+      const bullets = section.lines.filter((line) => /^[-•]\s+/.test(line));
+      const paragraphs = section.lines.filter((line) => !/^[-•]\s+/.test(line));
+
+      const scoreTable =
+        isScorecard && scoreLines.length > 0
+          ? `<table>
+              <thead>
+                <tr><th>Competency</th><th>Score</th></tr>
+              </thead>
+              <tbody>
+                ${scoreLines
+                  .map(
+                    (item) =>
+                      `<tr><td>${inlineToHtml(item.label)}</td><td>${item.score}</td></tr>`
+                  )
+                  .join("")}
+              </tbody>
+            </table>`
+          : "";
+
+      const bulletsHtml =
+        bullets.length > 0
+          ? `<ul>${bullets
+              .map((line) => `<li>${inlineToHtml(line.replace(/^[-•]\s*/, ""))}</li>`)
+              .join("")}</ul>`
+          : "";
+
+      const paragraphsHtml = paragraphs.map(renderLine).join("");
+
+      return `
+        <section>
+          <h2>${inlineToHtml(section.title)}</h2>
+          ${scoreTable}
+          ${paragraphsHtml}
+          ${bulletsHtml}
+        </section>
+      `;
+    })
+    .join("");
+
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; line-height: 1.6; }
+          h1 { font-size: 22px; margin: 0 0 12px; }
+          h2 { font-size: 18px; margin: 16px 0 8px; }
+          h4 { font-size: 14px; margin: 12px 0 6px; }
+          p { margin: 0 0 8px; }
+          ul { margin: 0 0 10px 16px; padding: 0; }
+          li { margin: 0 0 6px; }
+          table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+          th, td { border: 1px solid #cbd5f5; padding: 6px 8px; text-align: left; }
+          th { background: #eef2ff; }
+        </style>
+      </head>
+      <body>
+        <h1>${inlineToHtml(parsed.title || "Professional Growth Report")}</h1>
+        ${sectionsHtml}
+      </body>
+    </html>
+  `;
+};
+
 export default function Assessment() {
   const { withLoader } = useLoader();
   const [view, setView] = useState<ViewMode>("cards");
@@ -517,6 +618,149 @@ export default function Assessment() {
   const [report, setReport] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechError, setSpeechError] = useState<string>("");
+
+  const recognitionRef = useRef<any>(null);
+  const recordingQuestionIdRef = useRef<string | null>(null);
+  const pendingRecordingStartRef = useRef<string | null>(null);
+  const silenceTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+      return;
+    }
+
+    setSpeechSupported(true);
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+
+    const resetSilenceTimer = () => {
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+      }
+      silenceTimeoutRef.current = window.setTimeout(() => {
+        if (!recordingQuestionIdRef.current) return;
+        recognition.stop();
+      }, 5000); // 8 seconds of silence
+    };
+
+    recognition.onresult = (event: any) => {
+      resetSilenceTimer();
+      const questionId = recordingQuestionIdRef.current;
+      if (!questionId) return;
+
+      let finalTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0]?.transcript || "";
+        }
+      }
+
+      if (!finalTranscript) return;
+
+      setAnswers((prev) => {
+        const prevValue = prev[questionId] || "";
+        const separator = prevValue && !prevValue.endsWith(" ") ? " " : "";
+        return {
+          ...prev,
+          [questionId]: prevValue + separator + finalTranscript.trim(),
+        };
+      });
+    };
+
+    recognition.onerror = (event: any) => {
+      setSpeechError(
+        event?.error
+          ? `Speech recognition error: ${event.error}`
+          : "Speech recognition failed."
+      );
+      setRecordingQuestionId(null);
+      recordingQuestionIdRef.current = null;
+    };
+
+    recognition.onend = () => {
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
+      }
+
+      const nextId = pendingRecordingStartRef.current;
+      pendingRecordingStartRef.current = null;
+      if (nextId) {
+        recordingQuestionIdRef.current = nextId;
+        setRecordingQuestionId(nextId);
+        try {
+          recognition.start();
+          resetSilenceTimer();
+        } catch (err) {
+          setSpeechError("Unable to start speech recording.");
+        }
+        return;
+      }
+      setRecordingQuestionId(null);
+      recordingQuestionIdRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
+      }
+      try {
+        recognition.stop();
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
+  const toggleRecordingForQuestion = (questionId: string) => {
+    if (!recognitionRef.current) return;
+
+    setSpeechError("");
+
+    if (recordingQuestionIdRef.current === questionId) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    if (recordingQuestionIdRef.current) {
+      pendingRecordingStartRef.current = questionId;
+      recognitionRef.current.stop();
+      return;
+    }
+
+    recordingQuestionIdRef.current = questionId;
+    setRecordingQuestionId(questionId);
+    try {
+      recognitionRef.current.start();
+      // stop if user goes quiet for >8s
+      if (typeof window !== "undefined") {
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+        }
+        silenceTimeoutRef.current = window.setTimeout(() => {
+          recognitionRef.current?.stop();
+        }, 8000);
+      }
+    } catch (err) {
+      setSpeechError("Unable to start speech recording.");
+    }
+  };
 
   useEffect(() => {
     if (!activeCardId || view !== "questions") return;
@@ -598,15 +842,36 @@ export default function Assessment() {
   };
 
   const handleAnswerChange = (id: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [id]: value }));
+    const words = value.trim().split(/\s+/).filter((word) => word.length > 0);
+    if (words.length > 150) {
+      const limited = words.slice(0, 150).join(" ");
+      setAnswers((prev) => ({ ...prev, [id]: limited }));
+    } else {
+      setAnswers((prev) => ({ ...prev, [id]: value }));
+    }
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const downloadReportAsWord = () => {
+    const htmlContent = buildReportHtml(report);
+    const blob = new Blob([htmlContent], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "assessment-report.doc";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!activeCardId) return;
 
-    if (!hasAnyAnswer) {
-      setError("All fields should not be empty.");
+    // Check if all questions are answered
+    const unanswered = questions.filter(
+      (item) => !answers[item.id] || answers[item.id].trim().length === 0
+    );
+    if (unanswered.length > 0) {
+      setError(`Please answer all questions. ${unanswered.length} question(s) are empty.`);
       return;
     }
 
@@ -693,25 +958,54 @@ export default function Assessment() {
               </button>
             </div>
 
+            {speechError && (
+              <div className={styles.speechError}>{speechError}</div>
+            )}
             <form className={styles.questionsList} onSubmit={handleSubmit}>
-              {questions.map((item, index) => (
-                <div key={item.id} className={styles.questionCard}>
-                  <div className={styles.questionMeta}>Question {index + 1}</div>
-                  <div className={styles.questionText}>{renderRichText(item.question)}</div>
-                  {item.why && (
-                    <div className={styles.questionWhy}>
-                      <strong>Why this matters:</strong> {renderRichText(item.why)}
+              {questions.map((item, index) => {
+                const isRecording = recordingQuestionId === item.id;
+                const wordCount = ((answers[item.id] || "").trim().split(/\s+/).filter(word => word.length > 0).length);
+                return (
+                  <div key={item.id} className={styles.questionCard}>
+                    <div className={styles.questionMeta}>Question {index + 1}</div>
+                    <div className={styles.questionText}>{renderRichText(item.question)}</div>
+                    {item.why && (
+                      <div className={styles.questionWhy}>
+                        <strong>Why this matters:</strong> {renderRichText(item.why)}
+                      </div>
+                    )}
+                    <div className={styles.answerInputWrapper}>
+                      <textarea
+                        className={`${styles.answerInput} ${
+                          isRecording ? styles.answerInputRecording : ""
+                        }`}
+                        rows={4}
+                        placeholder="Write your response here..."
+                        value={answers[item.id] || ""}
+                        onChange={(event) => handleAnswerChange(item.id, event.target.value)}
+                      />
+                      {speechSupported && (
+                        <button
+                          type="button"
+                          className={`${styles.recordButton} ${
+                            isRecording ? styles.recordButtonActive : ""
+                          }`}
+                          onClick={() => toggleRecordingForQuestion(item.id)}
+                          aria-label={isRecording ? "Stop recording" : "Record answer"}
+                        >
+                          {isRecording ? "Stop recording" : "Record answer"}
+                        </button>
+                      )}
                     </div>
-                  )}
-                  <textarea
-                    className={styles.answerInput}
-                    rows={4}
-                    placeholder="Write your response here..."
-                    value={answers[item.id] || ""}
-                    onChange={(event) => handleAnswerChange(item.id, event.target.value)}
-                  />
-                </div>
-              ))}
+                    <div className={styles.wordCount}>
+                      {wordCount} / 150 words
+                    </div>
+                    {isRecording && (
+                      <div className={styles.speechHint}>Recording… click button again to stop.</div>
+                    )}
+                  </div>
+                );
+              })}
 
               {hasQuestions && (
                 <div className={styles.submitRow}>
@@ -729,9 +1023,14 @@ export default function Assessment() {
           <div className={styles.reportSection}>
             <div className={styles.questionsHeader}>
               <h2 className={styles.questionsTitle}>📘 Professional Growth Report</h2>
-              <button type="button" className={styles.backButton} onClick={handleBackToCards}>
-                Back to cards
-              </button>
+              <div className={styles.downloadButtons}>
+                <button type="button" className={styles.backButton} onClick={downloadReportAsWord}>
+                  Download Word
+                </button>
+                <button type="button" className={styles.backButton} onClick={handleBackToCards}>
+                  Back to cards
+                </button>
+              </div>
             </div>
             {error && <div className={styles.error}>{error}</div>}
             <div className={styles.reportBody}>{renderReport(report)}</div>
