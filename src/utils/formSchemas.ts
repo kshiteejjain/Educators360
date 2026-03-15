@@ -1,37 +1,40 @@
 import type { Schema } from "./schemaUtils";
 
 export type RegisterFormRecord = {
-  role: "teacher" | "student";
   name: string;
   email: string;
-  password: string;
+  mobileNumber: string;
+  city: string;
+  currentRole: string;
   subject: string;
   board: string;
-  mobileNumber: string;
+  organizationName: string;
 };
 
 export const registerFormSchema: Schema<RegisterFormRecord> = {
   name: "registerForm",
   storageKey: "rnw-register-form",
   columns: {
-    role: "teacher",
     name: "",
     email: "",
-    password: "",
+    mobileNumber: "",
+    city: "",
+    currentRole: "",
     subject: "",
     board: "",
-    mobileNumber: "",
+    organizationName: "",
   },
 };
 
 export type RegisterRecord = {
-  role: "teacher" | "student";
   name: string;
   email: string;
-  password: string;
+  mobileNumber: string;
+  city: string;
+  currentRole: string;
   subject: string;
   board: string;
-  mobileNumber: string;
+  organizationName: string;
   createdAt: string;
   registeredAt?: string;
 };
@@ -40,13 +43,14 @@ export const registerSchema: Schema<RegisterRecord> = {
   name: "register",
   storageKey: "rnw-register",
   columns: {
-    role: "student",
     name: "",
     email: "",
-    password: "",
+    mobileNumber: "",
+    city: "",
+    currentRole: "",
     subject: "",
     board: "",
-    mobileNumber: "",
+    organizationName: "",
     createdAt: "",
     registeredAt: "",
   },

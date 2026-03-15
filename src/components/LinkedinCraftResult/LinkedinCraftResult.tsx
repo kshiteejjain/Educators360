@@ -64,7 +64,9 @@ export default function LinkedinCraftResult({ result, targetRole }: Props) {
           <h3>Experience Bullet Blueprint</h3>
           <ul>
             {listOrEmpty(result.profileBlueprint.experienceBullets).map((item, idx) => (
-              <li key={`exp-${idx}`}>{item}</li>
+              <li key={`exp-${idx}`} className={styles.listItem}>
+                {item}
+              </li>
             ))}
           </ul>
         </div>
@@ -82,7 +84,9 @@ export default function LinkedinCraftResult({ result, targetRole }: Props) {
           <h3>Featured / Activity Ideas</h3>
           <ul>
             {listOrEmpty(result.profileBlueprint.activityIdeas).map((item, idx) => (
-              <li key={`act-${idx}`}>{item}</li>
+              <li key={`act-${idx}`} className={styles.listItem}>
+                {item}
+              </li>
             ))}
           </ul>
         </div>

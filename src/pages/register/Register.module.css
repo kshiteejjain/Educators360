@@ -167,6 +167,22 @@
   margin-top: 15px;
 }
 
+.fieldError {
+  color: var(--color-secondary);
+  font-size: 0.85rem;
+  margin: 6px 0 0;
+}
+
+.stepActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btnSecondary{
+  margin: 0;
+}
+
 /* ---------- ANIMATIONS ---------- */
 @keyframes slideInLeft {
   from {

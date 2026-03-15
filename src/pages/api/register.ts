@@ -4,13 +4,14 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/utils/firebase";
 
 type RegisterRequestBody = {
-  role?: "teacher" | "student";
   name?: string;
   email?: string;
-  password?: string;
   mobileNumber?: string;
+  city?: string;
+  currentRole?: string;
   subject?: string;
   board?: string;
+  organizationName?: string;
 };
 
 export default async function handler(
@@ -23,24 +24,37 @@ export default async function handler(
   }
 
   const {
-    role,
     name,
     email,
-    password,
     mobileNumber = "",
+    city = "",
+    currentRole = "",
     subject = "",
     board = "",
+    organizationName = "",
   } = req.body as RegisterRequestBody;
 
-  if (!email || !password || !name || !role) {
-    return res
-      .status(400)
-      .json({ message: "role, name, email, and password are required." });
+  const normalizedEmail = email?.trim();
+
+  if (
+    !normalizedEmail ||
+    !name ||
+    !mobileNumber.trim() ||
+    !city.trim() ||
+    !currentRole.trim() ||
+    !subject.trim() ||
+    !board.trim() ||
+    !organizationName.trim()
+  ) {
+    return res.status(400).json({
+      message:
+        "name, email, mobileNumber, city, currentRole, subject, board, and organizationName are required.",
+    });
   }
 
   try {
     const db = getDb();
-    const userRef = doc(db, "upEducatePlusUsers", email);
+    const userRef = doc(db, "upEducatePlusUsers", normalizedEmail);
     const existingUser = await getDoc(userRef);
 
     if (existingUser.exists()) {
@@ -49,13 +63,14 @@ export default async function handler(
 
     await setDoc(userRef, {
       userId: randomUUID(),
-      role,
       name,
-      email,
-      password,
-      mobileNumber: mobileNumber,
+      email: normalizedEmail,
+      mobileNumber: mobileNumber.trim(),
+      city: city.trim(),
+      currentRole: currentRole.trim(),
       subject: subject.trim(),
       board: board.trim(),
+      organizationName: organizationName.trim(),
       createdAt: serverTimestamp(),
       registeredAt: serverTimestamp(),
     });
