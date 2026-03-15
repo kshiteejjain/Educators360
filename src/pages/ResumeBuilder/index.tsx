@@ -153,6 +153,7 @@ export default function ResumeBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const { withLoader } = useLoader();
   const aiResultRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const hasHydratedResume = useRef(false);
   const hasHydratedTargetRole = useRef(false);
 
@@ -775,8 +776,33 @@ export default function ResumeBuilder() {
     return (
       <div ref={previewRef} className={styles.navyWrapper} data-resume-template="navy">
         <div className={styles.navySidebar} data-resume-sidebar>
-          <div className={styles.photoCircle}>
+          <div
+            className={styles.photoCircle}
+            role="button"
+            tabIndex={0}
+            onClick={() => photoInputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                photoInputRef.current?.click();
+              }
+            }}
+            aria-label="Upload profile photo"
+          >
             <Image src={photoSrc} alt="Profile" width={120} height={120} />
+            <span className={styles.photoCamera} aria-hidden="true">
+              📷
+            </span>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className={styles.photoInput}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handlePhotoUpload(file);
+              }}
+            />
           </div>
           <div className={styles.sidebarBlock}>
             <h4>CONTACT</h4>
