@@ -12,6 +12,7 @@ type RegisterRequestBody = {
   subject?: string;
   board?: string;
   organizationName?: string;
+  password?: string;
 };
 
 export default async function handler(
@@ -32,6 +33,7 @@ export default async function handler(
     subject = "",
     board = "",
     organizationName = "",
+    password = "",
   } = req.body as RegisterRequestBody;
 
   const normalizedEmail = email?.trim();
@@ -44,11 +46,12 @@ export default async function handler(
     !currentRole.trim() ||
     !subject.trim() ||
     !board.trim() ||
-    !organizationName.trim()
+    !organizationName.trim() ||
+    !password.trim()
   ) {
     return res.status(400).json({
       message:
-        "name, email, mobileNumber, city, currentRole, subject, board, and organizationName are required.",
+        "name, email, mobileNumber, city, currentRole, subject, board, organizationName, and password are required.",
     });
   }
 
@@ -71,6 +74,7 @@ export default async function handler(
       subject: subject.trim(),
       board: board.trim(),
       organizationName: organizationName.trim(),
+      password: password.trim(),
       createdAt: serverTimestamp(),
       registeredAt: serverTimestamp(),
     });

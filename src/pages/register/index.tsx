@@ -114,6 +114,7 @@ export default function Register() {
       "subject",
       "board",
       "organizationName",
+      "password",
     ];
 
     if (!validateFields(allFields)) {
@@ -130,6 +131,7 @@ export default function Register() {
       subject: formData.subject,
       board: formData.board,
       organizationName: formData.organizationName,
+      password: formData.password,
       createdAt: new Date().toISOString(),
     };
 
@@ -342,6 +344,22 @@ export default function Register() {
                     <p className={styles.fieldError}>
                       {fieldErrors.organizationName}
                     </p>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label>Password *</label>
+                  <input
+                    type="password"
+                    name="password"
+                    className="form-control"
+                    placeholder="Enter password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                  />
+                  {fieldErrors.password && (
+                    <p className={styles.fieldError}>{fieldErrors.password}</p>
                   )}
                 </div>
 

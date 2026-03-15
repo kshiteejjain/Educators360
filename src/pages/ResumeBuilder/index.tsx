@@ -488,157 +488,31 @@ export default function ResumeBuilder() {
         const target = previewRef.current;
         if (!target) return;
 
+        const canvas = await html2canvas(target, {
+          useCORS: true,
+          scale: 2,
+          backgroundColor: "#ffffff",
+          windowWidth: target.scrollWidth,
+          windowHeight: target.scrollHeight,
+          scrollY: -window.scrollY,
+        });
+
+        const pageWidth = 595.28; // A4 width in points
+        const renderHeight = (canvas.height * pageWidth) / canvas.width;
         const pdf = new jsPDF({
           orientation: "portrait",
           unit: "pt",
-          format: "a4",
+          format: [pageWidth, renderHeight],
         });
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 24;
-        const contentWidth = pageWidth - margin * 2;
-        const contentHeight = pageHeight - margin * 2;
-        const isNavy = previewTemplate === "navy";
-        const sidebarEl = isNavy
-          ? target.querySelector("[data-resume-sidebar]")
-          : null;
-        const mainEl = isNavy
-          ? target.querySelector(`.${styles.navyMain}`)
-          : null;
 
-        const sliceToDataUrl = (
-          source: HTMLCanvasElement,
-          offsetY: number,
-          sliceHeight: number
-        ) => {
-          const pageCanvas = document.createElement("canvas");
-          pageCanvas.width = source.width;
-          pageCanvas.height = sliceHeight;
-          const ctx = pageCanvas.getContext("2d");
-          if (!ctx) return null;
-          ctx.drawImage(
-            source,
-            0,
-            offsetY,
-            source.width,
-            sliceHeight,
-            0,
-            0,
-            source.width,
-            sliceHeight
-          );
-          return pageCanvas.toDataURL("image/png");
-        };
-
-        if (
-          isNavy &&
-          sidebarEl instanceof HTMLElement &&
-          mainEl instanceof HTMLElement
-        ) {
-          const [sidebarCanvas, mainCanvas] = await Promise.all([
-            html2canvas(sidebarEl, {
-              useCORS: true,
-              scale: 2,
-              backgroundColor: null,
-              windowWidth: sidebarEl.scrollWidth,
-              windowHeight: sidebarEl.scrollHeight,
-              scrollY: -window.scrollY,
-            }),
-            html2canvas(mainEl, {
-              useCORS: true,
-              scale: 2,
-              backgroundColor: "#ffffff",
-              windowWidth: mainEl.scrollWidth,
-              windowHeight: mainEl.scrollHeight,
-              scrollY: -window.scrollY,
-            }),
-          ]);
-
-          const totalWidthPx = sidebarCanvas.width + mainCanvas.width;
-          const ratio = contentWidth / totalWidthPx;
-          const pageHeightPx = contentHeight / ratio;
-          const totalHeightPx = Math.max(sidebarCanvas.height, mainCanvas.height);
-          const sidebarWidth = sidebarCanvas.width * ratio;
-          const mainWidth = mainCanvas.width * ratio;
-          let offsetY = 0;
-
-          while (offsetY < totalHeightPx) {
-            const sliceHeight = Math.min(pageHeightPx, totalHeightPx - offsetY);
-            pdf.setFillColor(11, 41, 66);
-            pdf.rect(margin, margin, sidebarWidth, contentHeight, "F");
-
-            if (offsetY < sidebarCanvas.height) {
-              const sidebarSliceHeight = Math.min(
-                sliceHeight,
-                sidebarCanvas.height - offsetY
-              );
-              const sidebarImg = sliceToDataUrl(
-                sidebarCanvas,
-                offsetY,
-                sidebarSliceHeight
-              );
-              if (sidebarImg) {
-                pdf.addImage(
-                  sidebarImg,
-                  "PNG",
-                  margin,
-                  margin,
-                  sidebarWidth,
-                  sidebarSliceHeight * ratio
-                );
-              }
-            }
-
-            if (offsetY < mainCanvas.height) {
-              const mainSliceHeight = Math.min(
-                sliceHeight,
-                mainCanvas.height - offsetY
-              );
-              const mainImg = sliceToDataUrl(mainCanvas, offsetY, mainSliceHeight);
-              if (mainImg) {
-                pdf.addImage(
-                  mainImg,
-                  "PNG",
-                  margin + sidebarWidth,
-                  margin,
-                  mainWidth,
-                  mainSliceHeight * ratio
-                );
-              }
-            }
-
-            offsetY += sliceHeight;
-            if (offsetY < totalHeightPx) {
-              pdf.addPage();
-            }
-          }
-        } else {
-          const canvas = await html2canvas(target, {
-            useCORS: true,
-            scale: 2,
-            backgroundColor: "#ffffff",
-            windowWidth: target.scrollWidth,
-            windowHeight: target.scrollHeight,
-            scrollY: -window.scrollY,
-          });
-
-          const ratio = contentWidth / canvas.width;
-          const pageHeightPx = contentHeight / ratio;
-          let offsetY = 0;
-
-          while (offsetY < canvas.height) {
-            const sliceHeight = Math.min(pageHeightPx, canvas.height - offsetY);
-            const imgData = sliceToDataUrl(canvas, offsetY, sliceHeight);
-            if (imgData) {
-              const imgHeight = sliceHeight * ratio;
-              pdf.addImage(imgData, "PNG", margin, margin, contentWidth, imgHeight);
-            }
-            offsetY += sliceHeight;
-            if (offsetY < canvas.height) {
-              pdf.addPage();
-            }
-          }
-        }
+        pdf.addImage(
+          canvas.toDataURL("image/png"),
+          "PNG",
+          0,
+          0,
+          pageWidth,
+          renderHeight
+        );
 
         const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
         const roleSlug = (form.title || selectedTemplate.title || "role")
@@ -759,15 +633,27 @@ export default function ResumeBuilder() {
           return;
         }
         setAiResult(data);
+        const targetJobValue = targetJob.trim();
         if (data.parsedResume) {
           const normalized = normalizeParsedResume(data.parsedResume);
           if (normalized) {
             setForm((prev) => ({
               ...prev,
               ...normalized,
+              title: targetJobValue || normalized.title || prev.title,
               photo: normalized.photo || prev.photo,
             }));
+          } else if (targetJobValue) {
+            setForm((prev) => ({
+              ...prev,
+              title: targetJobValue,
+            }));
           }
+        } else if (targetJobValue) {
+          setForm((prev) => ({
+            ...prev,
+            title: targetJobValue,
+          }));
         }
       }, "Generating AI feedback...");
     } catch (error) {

@@ -9,6 +9,7 @@ export type RegisterFormRecord = {
   subject: string;
   board: string;
   organizationName: string;
+  password: string;
 };
 
 export const registerFormSchema: Schema<RegisterFormRecord> = {
@@ -23,6 +24,7 @@ export const registerFormSchema: Schema<RegisterFormRecord> = {
     subject: "",
     board: "",
     organizationName: "",
+    password: "",
   },
 };
 
@@ -35,6 +37,7 @@ export type RegisterRecord = {
   subject: string;
   board: string;
   organizationName: string;
+  password: string;
   createdAt: string;
   registeredAt?: string;
 };
@@ -51,6 +54,7 @@ export const registerSchema: Schema<RegisterRecord> = {
     subject: "",
     board: "",
     organizationName: "",
+    password: "",
     createdAt: "",
     registeredAt: "",
   },
