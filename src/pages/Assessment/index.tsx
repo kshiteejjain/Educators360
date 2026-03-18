@@ -225,7 +225,7 @@ const renderRichText = (value: string) => {
     if (headingMatch) {
       flushList();
       const level = Math.min(6, headingMatch[0].split(" ")[0].length);
-      const Heading = `h${level}` as keyof JSX.IntrinsicElements;
+      const Heading = `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
       blocks.push(
         <Heading key={`h-${index}`} className={styles.richHeading}>
           {renderInline(headingMatch[1])}
