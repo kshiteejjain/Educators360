@@ -48,14 +48,14 @@ type AnalysisResult = {
     };
     replacementMap?: {
       section:
-        | "Headline"
-        | "About"
-        | "Experience"
-        | "Skills"
-        | "Activity"
-        | "Benchmarking"
-        | "Final Suggestions"
-        | "General";
+      | "Headline"
+      | "About"
+      | "Experience"
+      | "Skills"
+      | "Activity"
+      | "Benchmarking"
+      | "Final Suggestions"
+      | "General";
       replace: string;
       with: string;
       rationale?: string;
@@ -123,6 +123,20 @@ const sectionIconLabel = (title: string, fallback: string) => {
   if (normalized.includes("activity") || normalized.includes("engagement")) return "📢";
   if (normalized.includes("suggestion")) return "🚀";
   return fallback;
+};
+
+const renderQuotedHighlight = (value: string, className: string) => {
+  const parts = value.split(/(".*?")/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("\"") && part.endsWith("\"")) {
+      return (
+        <strong key={`q-${idx}`} className={className}>
+          {part}
+        </strong>
+      );
+    }
+    return <span key={`t-${idx}`}>{part}</span>;
+  });
 };
 
 const buildCvText = (resumeData: Record<string, unknown>) => {
@@ -232,8 +246,8 @@ const buildLinkedinReportHtml = (
           const scoreTag = item.scoreImpact ? ` (+${item.scoreImpact} score)` : "";
           const suggestion = item.suggestion
             ? `<div><strong>Replace / Action Plan</strong><p>${inline(
-                item.suggestion
-              )}</p></div>`
+              item.suggestion
+            )}</p></div>`
             : "";
           return `<div>
               <p><strong>${inline(item.text)}</strong>${inline(scoreTag)}</p>
@@ -251,13 +265,12 @@ const buildLinkedinReportHtml = (
               <strong>Replace / With</strong>
               <ul>
                 ${replacements
-                  .map(
-                    (item) =>
-                      `<li>Replace "${inline(item.replace)}" with "${inline(item.with)}"${
-                        item.rationale ? ` - ${inline(item.rationale)}` : ""
-                      }</li>`
-                  )
-                  .join("")}
+            .map(
+              (item) =>
+                `<li>Replace "${inline(item.replace)}" with "${inline(item.with)}"${item.rationale ? ` - ${inline(item.rationale)}` : ""
+                }</li>`
+            )
+            .join("")}
               </ul>
             </div>`
           : "";
@@ -279,18 +292,16 @@ const buildLinkedinReportHtml = (
         <h2>AI Recommended Changes</h2>
         ${aiMods.headline ? `<h3>Headline Rewrite</h3><p>${inline(aiMods.headline)}</p>` : ""}
         ${aiMods.about ? `<h3>About Section</h3><p>${inline(aiMods.about)}</p>` : ""}
-        ${
-          aiMods.experienceBullets?.length
-            ? `<h3>Experience Bullet Upgrades</h3>${renderList(
-                aiMods.experienceBullets
-              )}`
-            : ""
-        }
-        ${
-          aiMods.skills?.length
-            ? `<h3>Skill Additions</h3><p>${inline(aiMods.skills.join(", "))}</p>`
-            : ""
-        }
+        ${aiMods.experienceBullets?.length
+      ? `<h3>Experience Bullet Upgrades</h3>${renderList(
+        aiMods.experienceBullets
+      )}`
+      : ""
+    }
+        ${aiMods.skills?.length
+      ? `<h3>Skill Additions</h3><p>${inline(aiMods.skills.join(", "))}</p>`
+      : ""
+    }
       </section>
     `
     : "";
@@ -313,38 +324,35 @@ const buildLinkedinReportHtml = (
         <h1>LinkedIn Profile Analysis</h1>
         <p><strong>Target Role:</strong> ${inline(targetRoleValue)}</p>
         <p><strong>Profile Score:</strong> ${inline(
-          String(score.score)
-        )} / ${inline(String(score.max))}</p>
+    String(score.score)
+  )} / ${inline(String(score.max))}</p>
         <p>${inline(
-          result.aiAnalysis?.scoreRationale ||
-            "We analyzed your LinkedIn profile for clarity, impact, and recruiter relevance."
-        )}</p>
-        ${
-          alignment
-            ? `
+    result.aiAnalysis?.scoreRationale ||
+    "We analyzed your LinkedIn profile for clarity, impact, and recruiter relevance."
+  )}</p>
+        ${alignment
+      ? `
           <section>
             <h2>Target Role Alignment</h2>
             ${alignment.fitSummary ? `<p>${inline(alignment.fitSummary)}</p>` : ""}
             ${alignment.strengths?.length ? `<h3>Strengths to Highlight</h3>${renderList(alignment.strengths)}` : ""}
             ${alignment.gaps?.length ? `<h3>Gaps to Fix</h3>${renderList(alignment.gaps)}` : ""}
-            ${
-              alignment.priorityFixes?.length
-                ? `<h3>Priority Fixes</h3>${renderList(alignment.priorityFixes)}`
-                : ""
-            }
+            ${alignment.priorityFixes?.length
+        ? `<h3>Priority Fixes</h3>${renderList(alignment.priorityFixes)}`
+        : ""
+      }
           </section>
         `
-            : ""
-        }
+      : ""
+    }
         ${sectionsHtml}
         ${aiModsHtml}
-        ${
-          result.aiAnalysis?.recommendations?.length
-            ? `<section><h2>Final Suggestions</h2>${renderList(
-                result.aiAnalysis.recommendations
-              )}</section>`
-            : ""
-        }
+        ${result.aiAnalysis?.recommendations?.length
+      ? `<section><h2>Final Suggestions</h2>${renderList(
+        result.aiAnalysis.recommendations
+      )}</section>`
+      : ""
+    }
       </body>
     </html>
   `;
@@ -357,7 +365,9 @@ export default function LinkedinAnalysis() {
   const [craftResult, setCraftResult] = useState<CraftResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [noLinkedin, setNoLinkedin] = useState(false);
+  const [activeCard, setActiveCard] = useState<"linkedin" | "noLinkedin">(
+    "linkedin"
+  );
   const [resumeStatus, setResumeStatus] = useState<"checking" | "present" | "missing">(
     "checking"
   );
@@ -439,10 +449,12 @@ export default function LinkedinAnalysis() {
     void fetchProfile();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, mode: "linkedin" | "noLinkedin") => {
     e.preventDefault();
     setError("");
     setFieldErrors({});
+
+    const isNoLinkedin = mode === "noLinkedin";
 
     if (resumeStatus !== "present") {
       setError("Please upload or create your resume to access this feature.");
@@ -450,7 +462,7 @@ export default function LinkedinAnalysis() {
     }
 
     const nextErrors: { linkedinUrl?: string; targetRole?: string } = {};
-    if (!noLinkedin && !linkedinUrl.trim()) {
+    if (!isNoLinkedin && !linkedinUrl.trim()) {
       nextErrors.linkedinUrl = "Please enter a valid LinkedIn profile URL";
     }
     if (!targetRole.trim()) {
@@ -469,7 +481,7 @@ export default function LinkedinAnalysis() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            noLinkedin
+            isNoLinkedin
               ? { profileText: resumeCvText, targetRole }
               : { profileUrl: linkedinUrl, targetRole }
           ),
@@ -483,7 +495,7 @@ export default function LinkedinAnalysis() {
           );
         }
 
-        if (noLinkedin) {
+        if (isNoLinkedin) {
           const craftResponse = await fetch("/api/linkedinProfileCraft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -537,14 +549,14 @@ export default function LinkedinAnalysis() {
           };
           replacementMap?: {
             section:
-              | "Headline"
-              | "About"
-              | "Experience"
-              | "Skills"
-              | "Activity"
-              | "Benchmarking"
-              | "Final Suggestions"
-              | "General";
+            | "Headline"
+            | "About"
+            | "Experience"
+            | "Skills"
+            | "Activity"
+            | "Benchmarking"
+            | "Final Suggestions"
+            | "General";
             replace: string;
             with: string;
             rationale?: string;
@@ -622,49 +634,49 @@ export default function LinkedinAnalysis() {
 
   return (
     <Layout>
-      <div className={styles.container}>
-        {/* Header */}
-        <div className={styles.header}>
-          <h1>LinkedIn Profile Analyzer</h1>
-          <p>Get AI-powered insights to optimize your LinkedIn profile and boost recruiter visibility</p>
-        </div>
 
-        {/* Input Section */}
-        <div className={styles.inputSection}>
-          {resumeStatus === "missing" && (
-            <div className={styles.resumeGate}>
-              <div className={styles.resumeGateIcon} aria-hidden="true" />
-              <div className={styles.resumeGateText}>
-                <strong>Resume required.</strong>{" "}
-                {hasSession
-                  ? "Please upload or create your resume to access this LinkedIn analysis feature."
-                  : "Please log in and upload or create your resume to access this feature."}{" "}
-                <Link href={hasSession ? "/ResumeBuilder" : "/login"} className={styles.resumeGateLink}>
-                  {hasSession ? "Go to Resume Builder" : "Go to Login"}
-                </Link>
-                .
+      {/* Header */}
+      <div className={styles.header}>
+        <h1>LinkedIn Profile Analyzer</h1>
+        <p>Get AI-powered insights to optimize your LinkedIn profile and boost recruiter visibility</p>
+      </div>
+
+      {/* Input Section */}
+      <div className={styles.inputSection}>
+        {resumeStatus === "missing" && (
+          <div className={styles.resumeGate}>
+            <div className={styles.resumeGateIcon} aria-hidden="true" />
+            <div className={styles.resumeGateText}>
+              <strong>Resume required.</strong>{" "}
+              {hasSession
+                ? "Please upload or create your resume to access this LinkedIn analysis feature."
+                : "Please log in and upload or create your resume to access this feature."}{" "}
+              <Link href={hasSession ? "/ResumeBuilder" : "/login"} className={styles.resumeGateLink}>
+                {hasSession ? "Go to Resume Builder" : "Go to Login"}
+              </Link>
+              .
+            </div>
+          </div>
+        )}
+        <div className={styles.inputCards}>
+          <form
+            onSubmit={(e) => {
+              void handleSubmit(e, "linkedin");
+            }}
+            onClick={() => setActiveCard("linkedin")}
+            className={`${styles.inputCard} ${activeCard === "linkedin" ? styles.cardActive : styles.cardInactive
+              }`}
+          >
+            <div className={styles.cardHeader}>
+              <div>
+                <h3>🔗 Already Have a LinkedIn Profile</h3>
+                <p>Paste your profile link and we will score it, then deliver clear fixes.</p>
               </div>
+              <span className={styles.cardBadge}>📊 Analysis</span>
             </div>
-          )}
-          <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.noLinkedinRow}>
-              <label className={styles.noLinkedinToggle}>
-                <input
-                  type="checkbox"
-                  checked={noLinkedin}
-                  onChange={(e) => {
-                    setNoLinkedin(e.target.checked);
-                  }}
-                  disabled={isLoading}
-                />
-                No LinkedIn profile
-              </label>
-            </div>
-            {!noLinkedin && (
+            <div className={styles.cardBody}>
               <div className="form-group">
-                <label htmlFor="linkedinUrl">
-                  Enter Your LinkedIn Profile URL *
-                </label>
+                <label htmlFor="linkedinUrl">Enter Your LinkedIn Profile URL *</label>
                 <input
                   id="linkedinUrl"
                   type="url"
@@ -682,258 +694,318 @@ export default function LinkedinAnalysis() {
                   aria-describedby={fieldErrors.linkedinUrl ? "linkedin-url-error" : undefined}
                   required
                 />
-                <p className={styles.hint}>Example: https://www.linkedin.com/in/kshiteejjain/</p>
+                <p className={styles.hint}>
+                  Example: https://www.linkedin.com/in/kshiteejjain/
+                </p>
                 {fieldErrors.linkedinUrl && (
                   <p id="linkedin-url-error" className={styles.fieldError}>
                     {fieldErrors.linkedinUrl}
                   </p>
                 )}
               </div>
-            )}
-            <div className="form-group">
-              <label htmlFor="targetRole">
-                Target Role *
-              </label>
-              <input
-                id="targetRole"
-                type="text"
-                value={targetRole}
-                onChange={(e) => {
-                  setTargetRole(e.target.value);
-                  if (fieldErrors.targetRole) {
-                    setFieldErrors((prev) => ({ ...prev, targetRole: undefined }));
-                  }
-                }}
-                placeholder="e.g., Maths Teacher"
-                className="form-control"
-                disabled={isLoading}
-                aria-invalid={Boolean(fieldErrors.targetRole)}
-                aria-describedby={fieldErrors.targetRole ? "target-role-error" : undefined}
-                required
-              />
-              <p className={styles.hint}>Example: Role you are looking for</p>
-              {fieldErrors.targetRole && (
-                <p id="target-role-error" className={styles.fieldError}>
-                  {fieldErrors.targetRole}
-                </p>
-              )}
+              <div className="form-group">
+                <label htmlFor="targetRole">Target Role *</label>
+                <input
+                  id="targetRole"
+                  type="text"
+                  value={targetRole}
+                  onChange={(e) => {
+                    setTargetRole(e.target.value);
+                    if (fieldErrors.targetRole) {
+                      setFieldErrors((prev) => ({ ...prev, targetRole: undefined }));
+                    }
+                  }}
+                  placeholder="e.g., Maths Teacher"
+                  className="form-control"
+                  disabled={isLoading}
+                  aria-invalid={Boolean(fieldErrors.targetRole)}
+                  aria-describedby={fieldErrors.targetRole ? "target-role-error" : undefined}
+                  required
+                />
+                <p className={styles.hint}>Example: Role you are looking for</p>
+                {fieldErrors.targetRole && (
+                  <p id="target-role-error" className={styles.fieldError}>
+                    {fieldErrors.targetRole}
+                  </p>
+                )}
+              </div>
             </div>
-
             <button
               type="submit"
-              className="btn-primary"
+              className={`btn-primary ${styles.cardButton}`}
               disabled={isLoading || resumeStatus !== "present"}
+              onClick={() => setActiveCard("linkedin")}
             >
               {isLoading ? "Analyzing..." : "Analyze Profile"}
             </button>
           </form>
 
-          {error && <div className={styles.error}>{error}</div>}
+          <form
+            onSubmit={(e) => {
+              void handleSubmit(e, "noLinkedin");
+            }}
+            onClick={() => setActiveCard("noLinkedin")}
+            className={`${styles.inputCard} ${styles.noLinkedinCard} ${activeCard === "noLinkedin" ? styles.cardActive : styles.cardInactive
+              }`}
+          >
+            <div className={styles.cardHeader}>
+              <div>
+                <h3>✨ No LinkedIn Profile Yet</h3>
+                <p>We will craft a complete LinkedIn profile using your resume content.</p>
+              </div>
+              <span className={styles.cardBadge}>🛠️ Build</span>
+            </div>
+            <div className={styles.cardBody}>
+              <div className="form-group">
+                <label htmlFor="targetRoleNoLinkedin">Target Role *</label>
+                <input
+                  id="targetRoleNoLinkedin"
+                  type="text"
+                  value={targetRole}
+                  onChange={(e) => {
+                    setTargetRole(e.target.value);
+                    if (fieldErrors.targetRole) {
+                      setFieldErrors((prev) => ({ ...prev, targetRole: undefined }));
+                    }
+                  }}
+                  placeholder="e.g., Maths Teacher"
+                  className="form-control"
+                  disabled={isLoading}
+                  aria-invalid={Boolean(fieldErrors.targetRole)}
+                  aria-describedby={fieldErrors.targetRole ? "target-role-error" : undefined}
+                  required
+                />
+                <p className={styles.hint}>
+                  Example: Role you want the LinkedIn profile to target
+                </p>
+                {fieldErrors.targetRole && (
+                  <p id="target-role-error" className={styles.fieldError}>
+                    {fieldErrors.targetRole}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              type="submit"
+              className={`btn-primary ${styles.cardButton}`}
+              disabled={isLoading || resumeStatus !== "present"}
+              onClick={() => setActiveCard("noLinkedin")}
+            >
+              {isLoading ? "Building..." : "Build Linkedin Profie"}
+            </button>
+          </form>
         </div>
 
-        {/* Analysis Results */}
-        {analysisResult && (
-          <div className={styles.resultsSection}>
-            <div className={styles.resultsActions}>
-            </div>
-            <div className={styles.scoreCard}>
-              <div className={styles.scoreDisplay}>
-                <div className={styles.scoreCircle} style={{ borderColor: "#0a66c2" }}>
-                  <div className={styles.scoreValue}>
-                    {toDisplayScore(analysisResult.aiAnalysis?.aiScore).score}
-                  </div>
-                  <div className={styles.scoreMax}>
-                    / {toDisplayScore(analysisResult.aiAnalysis?.aiScore).max}
-                  </div>
-                </div>
-                <div className={styles.scoreInfo}>
-                  <h2>Profile Score</h2>
-                  <p className={styles.scoreMeta}>
-                    {toDisplayScore(analysisResult.aiAnalysis?.aiScore).score} /{" "}
-                    {toDisplayScore(analysisResult.aiAnalysis?.aiScore).max}
-                  </p>
-                  <p className={styles.scoreDescription}>
-                    {analysisResult.aiAnalysis?.scoreRationale ||
-                      "We analyzed your LinkedIn profile for clarity, impact, and recruiter relevance."}
-                  </p>
-                </div>
-              </div>
-            </div>
+        {error && <div className={styles.error}>{error}</div>}
+      </div>
 
-            {analysisResult.aiAnalysis?.alignmentSummary && (
-              <div className={styles.actionSection}>
-                <h2>Target Role Alignment</h2>
-                {analysisResult.aiAnalysis.alignmentSummary.fitSummary ? (
-                  <p className={styles.scoreDescription}>
-                    {analysisResult.aiAnalysis.alignmentSummary.fitSummary}
-                  </p>
-                ) : null}
-                {analysisResult.aiAnalysis.alignmentSummary.strengths?.length ? (
-                  <>
-                    <h3>Strengths to Highlight</h3>
-                    <ul className={styles.cardList}>
-                      {analysisResult.aiAnalysis.alignmentSummary.strengths.map((item, idx) => (
-                        <li key={`strength-${idx}`}>{item}</li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null}
-                {analysisResult.aiAnalysis.alignmentSummary.gaps?.length ? (
-                  <>
-                    <h3>Gaps to Fix</h3>
-                    <ul className={styles.cardList}>
-                      {analysisResult.aiAnalysis.alignmentSummary.gaps.map((item, idx) => (
-                        <li key={`gap-${idx}`}>{item}</li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null}
-                {analysisResult.aiAnalysis.alignmentSummary.priorityFixes?.length ? (
-                  <>
-                    <h3>Priority Fixes</h3>
-                    <ul className={styles.cardList}>
-                      {analysisResult.aiAnalysis.alignmentSummary.priorityFixes.map(
-                        (item, idx) => (
-                          <li key={`fix-${idx}`}>{item}</li>
-                        )
-                      )}
-                    </ul>
-                  </>
-                ) : null}
+      {/* Analysis Results */}
+      {analysisResult && (
+        <div className={styles.resultsSection}>
+          <div className={styles.resultsActions}>
+          </div>
+          <div className={styles.scoreCard}>
+            <div className={styles.scoreDisplay}>
+              <div className={styles.scoreCircle} style={{ borderColor: "#0a66c2" }}>
+                <div className={styles.scoreValue}>
+                  {toDisplayScore(analysisResult.aiAnalysis?.aiScore).score}
+                </div>
+                <div className={styles.scoreMax}>
+                  / {toDisplayScore(analysisResult.aiAnalysis?.aiScore).max}
+                </div>
               </div>
-            )}
-            <div className={styles.analysisGrid}>
-              {analysisResult.sections.map((section) => (
-                <div
-                  key={section.title}
-                  className={`${styles.section} ${sectionColorClass(section.color)}`}
-                >
-                  <div className={styles.sectionHeader}>
-                    <span className={styles.sectionIcon}>
-                      {sectionIconLabel(section.title, section.icon)}
-                    </span>
-                    <h3>{section.title}</h3>
-                  </div>
-                  <div className={styles.sectionContent}>
-                    {section.items.map((item, idx) => {
-                      const icon = iconForType(item.type);
-                      return (
-                        <div key={`${section.title}-${idx}`} className={styles.item}>
-                          <div className={styles.itemHeader}>
-                            <span className={icon.className}>{icon.label}</span>
-                            <span className={styles.itemInlineText}>{item.text}</span>
-                            {item.scoreImpact ? (
-                              <span className={styles.scoreTag}>
-                                {formatScoreImpact(item.scoreImpact)}
-                              </span>
-                            ) : null}
-                          </div>
-                          {item.suggestion ? (
-                            <div className={styles.suggestion}>
-                              <strong>Replace / Action Plan</strong>
-                              <p>{item.suggestion}</p>
-                            </div>
+              <div className={styles.scoreInfo}>
+                <h2>Profile Score</h2>
+                <p className={styles.scoreMeta}>
+                  {toDisplayScore(analysisResult.aiAnalysis?.aiScore).score} /{" "}
+                  {toDisplayScore(analysisResult.aiAnalysis?.aiScore).max}
+                </p>
+                <p className={styles.scoreDescription}>
+                  {analysisResult.aiAnalysis?.scoreRationale ||
+                    "We analyzed your LinkedIn profile for clarity, impact, and recruiter relevance."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {analysisResult.aiAnalysis?.alignmentSummary && (
+            <div className={styles.actionSection}>
+              <h2>Target Role Alignment</h2>
+              {analysisResult.aiAnalysis.alignmentSummary.fitSummary ? (
+                <p className={styles.scoreDescription}>
+                  {analysisResult.aiAnalysis.alignmentSummary.fitSummary}
+                </p>
+              ) : null}
+              {analysisResult.aiAnalysis.alignmentSummary.strengths?.length ? (
+                <>
+                  <h3>Strengths to Highlight</h3>
+                  <ul className={styles.cardList}>
+                    {analysisResult.aiAnalysis.alignmentSummary.strengths.map((item, idx) => (
+                      <li key={`strength-${idx}`}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {analysisResult.aiAnalysis.alignmentSummary.gaps?.length ? (
+                <>
+                  <h3>Gaps to Fix</h3>
+                  <ul className={styles.cardList}>
+                    {analysisResult.aiAnalysis.alignmentSummary.gaps.map((item, idx) => (
+                      <li key={`gap-${idx}`}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {analysisResult.aiAnalysis.alignmentSummary.priorityFixes?.length ? (
+                <>
+                  <h3>Priority Fixes</h3>
+                  <ul className={styles.cardList}>
+                    {analysisResult.aiAnalysis.alignmentSummary.priorityFixes.map(
+                      (item, idx) => (
+                        <li key={`fix-${idx}`}>{item}</li>
+                      )
+                    )}
+                  </ul>
+                </>
+              ) : null}
+            </div>
+          )}
+          <div className={styles.analysisGrid}>
+            {analysisResult.sections.map((section) => (
+              <div
+                key={section.title}
+                className={`${styles.section} ${sectionColorClass(section.color)}`}
+              >
+                <div className={styles.sectionHeader}>
+                  <span className={styles.sectionIcon}>
+                    {sectionIconLabel(section.title, section.icon)}
+                  </span>
+                  <h3>{section.title}</h3>
+                </div>
+                <div className={styles.sectionContent}>
+                  {section.items.map((item, idx) => {
+                    const icon = iconForType(item.type);
+                    return (
+                      <div key={`${section.title}-${idx}`} className={styles.item}>
+                        <div className={styles.itemHeader}>
+                          <span className={icon.className}>{icon.label}</span>
+                          <span className={styles.itemInlineText}>
+                            {renderQuotedHighlight(item.text, styles.inlineHighlight)}
+                          </span>
+                          {item.scoreImpact ? (
+                            <span className={styles.scoreTag}>
+                              {formatScoreImpact(item.scoreImpact)}
+                            </span>
                           ) : null}
                         </div>
-                      );
-                    })}
-                    {analysisResult.aiAnalysis?.replacementMap?.length ? (
-                      (() => {
-                        const sectionKey = normalizeSectionKey(section.title);
-                        const replacements = analysisResult.aiAnalysis?.replacementMap?.filter(
-                          (item) => item.section === sectionKey
-                        );
-                        if (!replacements || replacements.length === 0) return null;
-                        return (
+                        {item.suggestion ? (
                           <div className={styles.suggestion}>
-                            <strong>Replace / With</strong>
-                            <ul className={styles.cardList}>
-                              {replacements.map((item, idx) => (
-                                <li key={`${section.title}-replace-${idx}`}>
-                                  Replace "{item.replace}" with "{item.with}"
-                                  {item.rationale ? ` - ${item.rationale}` : ""}
-                                </li>
-                              ))}
-                            </ul>
+                            <strong>Replace / Action Plan</strong>
+                            <p>{renderQuotedHighlight(item.suggestion, styles.inlineHighlight)}</p>
                           </div>
-                        );
-                      })()
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {aiModifications && (
-              <div className={styles.aiSection}>
-                <div className={styles.aiHeader}>
-                  <h2>AI Recommended Changes</h2>
-                </div>
-                <p className={styles.aiRationale}>
-                  Review the suggested upgrades below and copy the sections that fit your voice.
-                </p>
-                <div className={styles.aiCardGrid}>
-                  {aiModifications.headline ? (
-                    <div className={styles.summaryCard}>
-                      <div className={styles.summaryLabel}>Headline Rewrite</div>
-                      <p className={styles.cardText}>{aiModifications.headline}</p>
-                    </div>
-                  ) : null}
-                  {aiModifications.about ? (
-                    <div className={styles.summaryCard}>
-                      <div className={styles.summaryLabel}>About Section</div>
-                      <p className={styles.cardText}>{aiModifications.about}</p>
-                    </div>
-                  ) : null}
-                  {aiModifications.experienceBullets?.length ? (
-                    <div className={styles.summaryCard}>
-                      <div className={styles.summaryLabel}>Experience Bullet Upgrades</div>
-                      <ul className={styles.cardList}>
-                        {aiModifications.experienceBullets.map((bullet, idx) => (
-                          <li key={`exp-${idx}`}>{bullet}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {aiModifications.skills?.length ? (
-                    <div className={styles.summaryCard}>
-                      <div className={styles.summaryLabel}>Skill Additions</div>
-                      <div className={styles.cardTags}>
-                        {aiModifications.skills.map((skill, idx) => (
-                          <span key={`skill-${idx}`} className={styles.cardTag}>
-                            {skill}
-                          </span>
-                        ))}
+                        ) : null}
                       </div>
-                    </div>
+                    );
+                  })}
+                  {analysisResult.aiAnalysis?.replacementMap?.length ? (
+                    (() => {
+                      const sectionKey = normalizeSectionKey(section.title);
+                      const replacements = analysisResult.aiAnalysis?.replacementMap?.filter(
+                        (item) => item.section === sectionKey
+                      );
+                      if (!replacements || replacements.length === 0) return null;
+                      return (
+                        <div className={styles.suggestion}>
+                          <strong>Replace / With</strong>
+                          <ul className={styles.cardList}>
+                            {replacements.map((item, idx) => (
+                              <li key={`${section.title}-replace-${idx}`}>
+                                Replace{" "}
+                                <strong className={styles.inlineHighlight}>"{item.replace}"</strong>{" "}
+                                with{" "}
+                                <strong className={styles.inlineHighlight}>"{item.with}"</strong>
+                                {item.rationale ? ` - ${item.rationale}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()
                   ) : null}
                 </div>
               </div>
-            )}
-
-            {analysisResult.aiAnalysis?.recommendations?.length ? (
-              <div className={styles.actionSection}>
-                <h2>Final Suggestions</h2>
-                <ul className={styles.cardList}>
-                  {analysisResult.aiAnalysis.recommendations.map((rec, idx) => (
-                    <li key={`rec-${idx}`}>{rec}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            <p><strong>Note:</strong> Download the AI report to access all recommendations and preserve your credits.</p>
-            <button type="button" className="btn-primary" onClick={downloadReportAsWord}>
-                Download AI Report
-              </button>
+            ))}
           </div>
-        )}
-        {craftResult && (
-          <LinkedinCraftResult
-            result={craftResult}
-            targetRole={targetRole}
-          />
-        )}
-      </div>
+
+          {aiModifications && (
+            <div className={styles.aiSection}>
+              <div className={styles.aiHeader}>
+                <h2>AI Recommended Changes</h2>
+              </div>
+              <p className={styles.aiRationale}>
+                Review the suggested upgrades below and copy the sections that fit your voice.
+              </p>
+              <div className={styles.aiCardGrid}>
+                {aiModifications.headline ? (
+                  <div className={styles.summaryCard}>
+                    <div className={styles.summaryLabel}>Headline Rewrite</div>
+                    <p className={styles.cardText}>{aiModifications.headline}</p>
+                  </div>
+                ) : null}
+                {aiModifications.about ? (
+                  <div className={styles.summaryCard}>
+                    <div className={styles.summaryLabel}>About Section</div>
+                    <p className={styles.cardText}>{aiModifications.about}</p>
+                  </div>
+                ) : null}
+                {aiModifications.experienceBullets?.length ? (
+                  <div className={styles.summaryCard}>
+                    <div className={styles.summaryLabel}>Experience Bullet Upgrades</div>
+                    <ul className={styles.cardList}>
+                      {aiModifications.experienceBullets.map((bullet, idx) => (
+                        <li key={`exp-${idx}`}>{bullet}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {aiModifications.skills?.length ? (
+                  <div className={styles.summaryCard}>
+                    <div className={styles.summaryLabel}>Skill Additions</div>
+                    <div className={styles.cardTags}>
+                      {aiModifications.skills.map((skill, idx) => (
+                        <span key={`skill-${idx}`} className={styles.cardTag}>
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {analysisResult.aiAnalysis?.recommendations?.length ? (
+            <div className={styles.actionSection}>
+              <h2>Final Suggestions</h2>
+              <ul className={styles.cardList}>
+                {analysisResult.aiAnalysis.recommendations.map((rec, idx) => (
+                  <li key={`rec-${idx}`}>{rec}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <p><strong>Note:</strong> Download the AI report to access all recommendations and preserve your credits.</p>
+          <button type="button" className="btn-primary" onClick={downloadReportAsWord}>
+            Download AI Report
+          </button>
+        </div>
+      )}
+      {craftResult && (
+        <LinkedinCraftResult
+          result={craftResult}
+          targetRole={targetRole}
+        />
+      )}
     </Layout>
   );
 }

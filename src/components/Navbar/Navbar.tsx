@@ -29,7 +29,11 @@ export default function Navbar() {
       segment
         .replace(/([A-Z])/g, " $1")
         .replace(/^./, (str) => str.toUpperCase()) || "Dashboard";
-    setPageTitle(title);
+    const titleOverrides: Record<string, string> = {
+      "assessment report": "Assessment: Professional Growth & Identity Report",
+    };
+    const resolvedTitle = titleOverrides[title.toLowerCase()] ?? title;
+    setPageTitle(resolvedTitle);
   }, [pathname]);
 
   useEffect(() => {
@@ -61,6 +65,23 @@ export default function Navbar() {
     push("/Profile");
   };
 
+  const clearBrowserStorage = () => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    } catch (err) {
+      console.warn("Failed to clear browser storage", err);
+    }
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    clearBrowserStorage();
+    setOpen(false);
+    push("/login");
+  };
+
   return (
     <header className={styles.navbar}>
       <h4 className={styles.pageTitle}>{pageTitle}</h4>
@@ -90,14 +111,7 @@ export default function Navbar() {
               </li>
               <li
                 className={styles.menuRow}
-                onClick={() => {
-                  clearSession();
-                  if (typeof window !== "undefined") {
-                    window.localStorage.removeItem("upeducateJobPrefix");
-                  }
-                  setOpen(false);
-                  push("/login");
-                }}
+                onClick={handleLogout}
               >
                 <span className={styles.menuIcon} aria-hidden="true">
                   🔓  

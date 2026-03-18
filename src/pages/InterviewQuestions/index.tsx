@@ -270,7 +270,7 @@ export default function InterviewQuestions() {
           }}
           title={allAnswered ? "Submit answers" : "Please answer all questions"}
         >
-          ðŸš€ Submit Answers
+          Submit Answers
         </button>
       )}
     </Layout>

@@ -11,36 +11,34 @@ type ReportResponse = {
   report: string;
 };
 
-const buildPrompt = (targetRole: string, cvText: string, pairedResponses: string) =>
-  [
-    "Report",
-    "Act as a Senior Career Coach and Educational Psychometrician.",
-    "Task: Analyze the provided data to generate a 'Professional Growth & Identity Report.' This report is designed for the candidate’s self-improvement and to help them bridge the gap toward their target role.",
-    "Inputs to Analyze:",
-    `Target Profile: ${targetRole}`,
-    `Candidate CV: ${cvText}`,
-    `The Paired Responses: ${pairedResponses}`,
-    "Analysis Instructions:",
-    "Contextual Mapping: For each Question/Answer pair, look for evidence of the candidate’s mindset, pedagogical depth, and leadership potential relative to the Target Profile.",
-    "Read Between the Lines: Don't just analyze what they said, but what they omitted. Are they missing mentions of inclusivity? Is their technology use surface-level?",
-    "Report Structure:",
-    "1. Professional Identity Profile:",
-    "The Persona: A title for their professional style (e.g., 'The Instructional Architect' or 'The Relationship-First Educator').",
-    "Core Philosophy: A summary of their underlying belief system about education based on their combined answers.",
-    "2. Competency Scorecard (Scale of 1-10):",
-    "Pedagogical Maturity: (Understanding of NEP 2020, FLN, and modern methods).",
-    "Emotional Intelligence (EQ): (Handling conflict, parent relations, and student empathy).",
-    "Operational Readiness: (How prepared they are for the daily demands of the Target Profile).",
-    "3. Strengths & 'Superpowers':",
-    "Identify 3 specific areas where the candidate’s answers showed mastery or unique talent.",
-    "4. Critical Growth Areas (The 'Alignment Gap'):",
-    "Identify 2-3 areas where the candidate’s responses suggest they are not yet fully ready for the Target Profile. Be specific—did they lack depth in leadership? Was their behavior management too traditional?",
-    "5. Refined Interview Strategy:",
-    "Pick the 2 weakest answers from their test and explain how they should have answered them to align better with modern educational standards.",
-    "6. Personalized Action Plan:",
-    "A '30-Day Development Roadmap' with 3 specific tasks to improve their profile.",
-    "Tone: Candid, constructive, and empowering.",
-  ].join("\n");
+const buildPrompt = (targetRole: string, cvText: string, pairedResponses: string) => `
+Act as a Senior Career Coach and Educational Psychometrician.
+Task: Analyze the provided data to generate a "Professional Growth & Identity Report." This report is designed for the candidate's self-improvement and to help them bridge the gap toward their target role.
+Inputs to Analyze:
+Target Profile: ${targetRole}
+Candidate CV: ${cvText}
+The Paired Responses: ${pairedResponses}
+Analysis Instructions:
+Contextual Mapping: For each Question/Answer pair, look for evidence of the candidate's mindset, pedagogical depth, and leadership potential relative to the Target Profile.
+Read Between the Lines: Don't just analyze what they said, but what they omitted. Are they missing mentions of inclusivity? Is their technology use surface-level?
+Report Structure:
+1. Professional Identity Profile:
+The Persona: A title for their professional style (e.g., "The Instructional Architect" or "The Relationship-First Educator").
+Core Philosophy: A summary of their underlying belief system about education based on their combined answers.
+2. Competency Scorecard (Scale of 1-10):
+Pedagogical Maturity: (Understanding of NEP 2020, FLN, and modern methods).
+Emotional Intelligence (EQ): (Handling conflict, parent relations, and student empathy).
+Operational Readiness: (How prepared they are for the daily demands of the Target Profile).
+3. Strengths & "Superpowers":
+Identify 3 specific areas where the candidate's answers showed mastery or unique talent.
+4. Critical Growth Areas (The "Alignment Gap"):
+Identify 2-3 areas where the candidate's responses suggest they are not yet fully ready for the Target Profile. Be specific—did they lack depth in leadership? Was their behavior management too traditional?
+5. Refined Interview Strategy:
+Pick the 2 weakest answers from their test and explain how they should have answered them to align better with modern educational standards.
+6. Personalized Action Plan:
+A "30-Day Development Roadmap" with 3 specific tasks to improve their profile.
+Tone: Candid, constructive, and empowering.
+`.trim();
 
 export default async function handler(
   req: NextApiRequest,

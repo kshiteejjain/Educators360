@@ -66,6 +66,12 @@
   color: var(--color-text);
 }
 
+.downloadButtons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .backButton {
   border: 1px solid #cbd5f5;
   background: #eef2ff;
@@ -113,6 +119,11 @@
 .questionWhy {
   margin: 0 0 12px;
   color: #475569;
+}
+
+.preserveText {
+  white-space: pre-wrap;
+  line-height: 1.55;
 }
 
 .richHeading {
@@ -236,13 +247,6 @@
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-.wordCount {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #64748b;
-  text-align: right;
-}
-
 .submitRow {
   display: flex;
   justify-content: flex-end;
@@ -265,6 +269,14 @@
   line-height: 1.7;
   font-size: 15px;
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+}
+
+.reportCardBody {
+  color: var(--color-text);
+}
+
+.reportFullText {
+  white-space: pre-wrap;
 }
 
 .scoreChartWrapper {
@@ -318,6 +330,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  animation: fadeSlideIn 0.35s ease;
 }
 
 .reportHero {
@@ -342,19 +355,39 @@
   padding: 8px 10px;
 }
 
+.reportHeroTitle {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: #0f172a;
+}
+
+.reportHeroSubtitle {
+  margin: 0;
+  color: #475569;
+}
+
+.reportHeroChart {
+  margin-top: 16px;
+}
+
+.reportHeroChart .scoreChartWrapper {
+  height: 240px;
+}
+
 .reportGrid {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 16px;
 }
 
-.reportCard {
+.reportRow {
   background: var(--color-white);
   width: 100%;
   border-radius: 18px;
   padding: 16px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  animation: fadeSlideIn 0.4s ease;
 }
 
 .reportCardHeader {
@@ -415,6 +448,17 @@
 .scoreGrid {
   display: grid;
   gap: 12px;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .error {

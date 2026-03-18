@@ -141,7 +141,7 @@ export default function Mentorship() {
       <div className={styles.container}>
         {/* Header */}
         <div className={styles.header}>
-          <h1>ðŸ“… Schedule 1:1 Mentorship Call</h1>
+          <h1>Schedule 1:1 Mentorship Call</h1>
           <p>Get personalized guidance from industry experts</p>
         </div>
 

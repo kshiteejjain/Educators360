@@ -45,6 +45,7 @@ type ResumeTemplate = {
   experiences: Experience[];
   education: Education[];
   certifications: string[];
+  sidebarColor?: string;
 };
 
 type AiResumeResult = {
@@ -84,6 +85,7 @@ const templates: ResumeTemplate[] = [
       "State Teaching License (Grades 6-12) (2020)",
       "Google Certified Educator Level 1 (2020)",
     ],
+    sidebarColor: "#0b2942",
     experiences: [
       {
         role: "English Teacher",
@@ -222,6 +224,9 @@ export default function ResumeBuilder() {
         certifications: Array.isArray(resumeData.certifications)
           ? (resumeData.certifications as unknown[]).map((cert) => String(cert))
           : [],
+        ...(typeof resumeData.sidebarColor === "string"
+          ? { sidebarColor: resumeData.sidebarColor }
+          : {}),
         experiences: Array.isArray(resumeData.experiences)
           ? (resumeData.experiences as unknown[]).map((exp) => ({
               role: String((exp as Record<string, unknown>)?.role ?? ""),
@@ -490,6 +495,7 @@ export default function ResumeBuilder() {
             experiences: form.experiences,
             education: form.education,
             certifications: form.certifications,
+            sidebarColor: form.sidebarColor ?? "",
           },
         };
 
@@ -822,7 +828,11 @@ export default function ResumeBuilder() {
     const photoSrc = resolvePhotoSrc(form.photo);
     return (
       <div ref={previewRef} className={styles.navyWrapper} data-resume-template="navy">
-        <div className={styles.navySidebar} data-resume-sidebar>
+        <div
+          className={styles.navySidebar}
+          data-resume-sidebar
+          style={{ backgroundColor: form.sidebarColor || "#0b2942" }}
+        >
           <div
             className={styles.photoCircle}
             role="button"
@@ -1674,6 +1684,24 @@ export default function ResumeBuilder() {
               </div>
             </div>
             <div className={styles.selectedTemplateInfo}>
+              {previewTemplate === "navy" && (
+                <div className={`${styles.noPrint} ${styles.sidebarColorPicker}`}>
+                  <label
+                    htmlFor="sidebar-color"
+                    className={styles.sidebarColorLabel}
+                  >
+                    Choose Color:
+                  </label>
+                  <input
+                    id="sidebar-color"
+                    type="color"
+                    className={styles.sidebarColorInput}
+                    value={form.sidebarColor || "#0b2942"}
+                    onChange={(e) => updateField("sidebarColor", e.target.value)}
+                    aria-label="Choose sidebar color"
+                  />
+                </div>
+              )}
               <span className={styles.selectedTemplateLabel}>Selected Template</span>
               <span className={styles.selectedTemplateValue}>
                 {templateOptions.find((option) => option.id === previewTemplate)?.label ??
