@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Layout from "@/components/Layout/Layout";
 import styles from "./AIInterview.module.css";
+import placeholderTeacher from "../../../public/placeholder-teacher.jpg";
 
 type ViewMode = "configure" | "interact";
 
@@ -105,7 +107,10 @@ export default function AIInterview() {
 
   const addLog = (message: string) => {
     const entry = `[${new Date().toLocaleTimeString()}] ${message}`;
-    setEventLog((prev) => [...prev.slice(-6), entry]);
+    setEventLog((prev) => {
+      const next = [...prev, entry];
+      return next.length > 200 ? next.slice(-200) : next;
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -195,7 +200,12 @@ export default function AIInterview() {
     const downsampled = downsampleBuffer(input, sampleRate, targetRate);
     const pcm16 = floatTo16BitPCM(downsampled);
     const base64 = arrayBufferToBase64(pcm16.buffer);
-    ws.send(JSON.stringify({ user_audio_chunk: base64 }));
+    ws.send(
+      JSON.stringify({
+        type: "user_audio_chunk",
+        user_audio_chunk: base64,
+      })
+    );
     const now = Date.now();
     if (now - lastUserAudioUiRef.current > 800) {
       lastUserAudioUiRef.current = now;
@@ -216,6 +226,7 @@ export default function AIInterview() {
     audioInputRef.current = source;
 
     await ctx.audioWorklet.addModule("/ai-interview-worklet.js");
+    addLog("Audio worklet loaded.");
     const worklet = new AudioWorkletNode(ctx, "ai-interview-processor");
     audioWorkletRef.current = worklet;
     worklet.port.onmessage = (event) => {
@@ -242,6 +253,7 @@ export default function AIInterview() {
     setEventLog([]);
     setLastUserAudioAt(null);
     setLastAiAudioAt(null);
+    addLog("Starting interview...");
     try {
       const response = await fetch("/api/elevenlabs/getSignedUrl");
       const data = (await response.json()) as { signedUrl?: string; message?: string };
@@ -251,30 +263,40 @@ export default function AIInterview() {
         addLog("Signed URL failed.");
         return;
       }
+      addLog("Signed URL received.");
 
       const ws = new WebSocket(data.signedUrl);
       socketRef.current = ws;
       ws.onopen = async () => {
         addLog("WebSocket connected.");
-        ws.send(
-          JSON.stringify({
-            type: "conversation_initiation_client_data",
-            conversation_config_override: configOverride,
-            dynamic_variables: {
-              coach_name: staticCoachName,
-              context_prompt: contextPrompt || "Not provided",
-            },
-          })
-        );
-        silenceStageRef.current = 0;
-        silenceDeadlineRef.current = null;
-        if (!silenceIntervalRef.current) {
-          silenceIntervalRef.current = window.setInterval(handleSilenceTick, 1000);
+        try {
+          ws.send(
+            JSON.stringify({
+              type: "conversation_initiation_client_data",
+              conversation_config_override: configOverride,
+              dynamic_variables: {
+                coach_name: staticCoachName,
+                context_prompt: contextPrompt || "Not provided",
+              },
+            })
+          );
+          addLog("Sent conversation init payload.");
+          silenceStageRef.current = 0;
+          silenceDeadlineRef.current = null;
+          if (!silenceIntervalRef.current) {
+            silenceIntervalRef.current = window.setInterval(handleSilenceTick, 1000);
+          }
+          await startMic(ws);
+          addLog("Microphone streaming started.");
+          setIsActive(true);
+          setStatus("live");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Mic init failed.";
+          addLog(`Mic init error: ${message}`);
+          setStatus("error");
+          setErrorMessage(message);
+          ws.close();
         }
-        await startMic(ws);
-        addLog("Microphone streaming started.");
-        setIsActive(true);
-        setStatus("live");
       };
       ws.onmessage = (event) => {
         try {
@@ -302,7 +324,9 @@ export default function AIInterview() {
             if (inputMatch) {
               inputSampleRateRef.current = Number(inputMatch[1]);
             }
-            addLog("Audio formats negotiated.");
+            addLog(
+              `Audio formats negotiated. input=${inputSampleRateRef.current} output=${outputSampleRateRef.current}`
+            );
           }
           if (data?.type === "audio" && data.audio_event?.audio_base_64) {
             const pcm = base64ToInt16(data.audio_event.audio_base_64);
@@ -315,8 +339,11 @@ export default function AIInterview() {
             silenceStageRef.current = 0;
             silenceDeadlineRef.current = null;
           }
+          if (data?.type && data.type !== "audio" && data.type !== "ping") {
+            addLog(`WS event: ${data.type}`);
+          }
         } catch {
-          // ignore malformed messages
+          addLog("Received malformed WS message.");
         }
       };
       ws.onclose = (event) => {
@@ -369,6 +396,8 @@ export default function AIInterview() {
     stopAudio();
   };
 
+  const handleClearLogs = () => setEventLog([]);
+
   return (
     <Layout>
       <section className={styles.page}>
@@ -411,8 +440,8 @@ export default function AIInterview() {
           <>
             <div className={styles.headerRow}>
               <div className={styles.interactionHeader}>
-                <h2 className={styles.interactionTitle}>AI Interaction</h2>
-                <div className={styles.subtitle}>AI Interview Assistant</div>
+                <h2 className={styles.interactionTitle}>AI Interview</h2>
+                <div className={styles.subtitle}>Voice-powered session</div>
                 <div className={styles.interactionSub}>
                   Tip: If the AI agent doesn&apos;t appear within a few seconds, please
                   refresh the page.
@@ -423,37 +452,53 @@ export default function AIInterview() {
               </button>
             </div>
 
-            <div className={styles.panel}>
-              <div
-                className={`${styles.interactionCard} ${isActive ? styles.interactionCardActive : ""
-                  }`}
-              >
-                <div className={styles.avatarCircle} aria-hidden="true" />
-                <div className={styles.interactionContent}>
-                  <div className={styles.status}>
-                    {status === "connecting"
-                      ? "Connecting..."
-                      : isActive
-                        ? "Talk to interrupt"
-                        : "Start Interview"}
+            <div className={styles.interviewLayout}>
+              <aside className={styles.agentPanel}>
+                <div className={styles.agentCard}>
+                  <div className={styles.agentAvatar}>
+                    <Image src={placeholderTeacher} alt="AI Interviewer" />
+                  </div>
+                  <div className={styles.agentName}>Interview Agent</div>
+                  <div className={styles.agentRole}>AI Interviewer</div>
+                  <div className={styles.agentDots} aria-hidden="true">
+                    • • • • • •
+                  </div>
+                  <div className={styles.agentStatusRow}>
+                    <span
+                      className={`${styles.statusDot} ${isActive ? styles.statusDotLive : ""}`}
+                    />
+                    <span className={styles.agentStatusText}>
+                      {status === "connecting"
+                        ? "Connecting..."
+                        : isActive
+                          ? "Interview in progress"
+                          : "Ready to start"}
+                    </span>
+                    <span className={styles.agentStatusBadge}>
+                      Mic {isMuted ? "off" : "on"}
+                    </span>
+                    <span className={styles.agentStatusBadge}>WiFi</span>
                   </div>
                   <div className={styles.speakingRow}>
                     <div className={styles.speakingLabel}>User</div>
-                    <div className={`${styles.speakingWave} ${isUserSpeaking ? styles.speakingWaveActive : ""}`}>
+                    <div
+                      className={`${styles.speakingWave} ${isUserSpeaking ? styles.speakingWaveActive : ""}`}
+                    >
                       <span />
                       <span />
                       <span />
                       <span />
                     </div>
                     <div className={styles.speakingLabel}>AI</div>
-                    <div className={`${styles.speakingWave} ${isAiSpeaking ? styles.speakingWaveActive : ""}`}>
+                    <div
+                      className={`${styles.speakingWave} ${isAiSpeaking ? styles.speakingWaveActive : ""}`}
+                    >
                       <span />
                       <span />
                       <span />
                       <span />
                     </div>
                   </div>
-
                   <div className={styles.actions}>
                     {isActive ? (
                       <button
@@ -476,7 +521,13 @@ export default function AIInterview() {
                     <button
                       type="button"
                       className={`${styles.iconButton} ${isMuted ? styles.muted : ""}`}
-                      onClick={() => setIsMuted((prev) => !prev)}
+                      onClick={() => {
+                        setIsMuted((prev) => {
+                          const next = !prev;
+                          addLog(next ? "Microphone muted." : "Microphone unmuted.");
+                          return next;
+                        });
+                      }}
                       aria-pressed={isMuted}
                       title={isMuted ? "Unmute" : "Mute"}
                       aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
@@ -486,30 +537,63 @@ export default function AIInterview() {
                   </div>
                   <div className={styles.audioStatus}>
                     <span>
-                      Mic:
-                      {" "}
+                      Mic{" "}
                       {lastUserAudioAt && Date.now() - lastUserAudioAt < 2000
                         ? "sending"
                         : "idle"}
                     </span>
                     <span>
-                      AI Audio:
-                      {" "}
+                      AI Audio{" "}
                       {lastAiAudioAt && Date.now() - lastAiAudioAt < 2000
                         ? "receiving"
                         : "idle"}
                     </span>
                   </div>
-                  {eventLog.length ? (
-                    <div className={styles.eventLog}>
-                      {eventLog.map((line) => (
-                        <div key={line}>{line}</div>
-                      ))}
-                    </div>
-                  ) : null}
                   {errorMessage ? <div className={styles.error}>{errorMessage}</div> : null}
                 </div>
-              </div>
+              </aside>
+
+              <main className={styles.chatPanel}>
+                <div className={styles.chatHeader}>
+                  <div>
+                    <h3>Conversation</h3>
+                    <p>Live transcript</p>
+                  </div>
+                </div>
+                <div className={styles.chatList}>
+                  <div className={styles.chatEmpty}>
+                    Conversation will appear here once the AI and user exchange messages.
+                  </div>
+                </div>
+
+                <div className={styles.eventLogBlock}>
+                  <div className={styles.eventLogHeader}>
+                    <span>Session Logs</span>
+                    <button
+                      type="button"
+                      className={styles.logAction}
+                      onClick={handleClearLogs}
+                      disabled={!eventLog.length}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className={styles.eventLog} role="log" aria-live="polite">
+                    {eventLog.length ? (
+                      eventLog.map((line) => <div key={line}>{line}</div>)
+                    ) : (
+                      <div className={styles.eventLogEmpty}>No logs yet.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className={styles.chatFooter}>
+                  <span className={styles.speakingHint}>
+                    {isUserSpeaking ? "You're speaking..." : "Waiting for audio..."}
+                  </span>
+                  <span className={styles.footerMeta}>Voice-powered interview</span>
+                </div>
+              </main>
             </div>
           </>
         )}

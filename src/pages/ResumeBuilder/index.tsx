@@ -44,6 +44,7 @@ type ResumeTemplate = {
   languages: string[];
   experiences: Experience[];
   education: Education[];
+  certifications: string[];
 };
 
 type AiResumeResult = {
@@ -78,6 +79,11 @@ const templates: ResumeTemplate[] = [
       { name: "EdTech Integration", rating: 4 },
     ],
     languages: ["English (Fluent)", "Hindi (Fluent)", "Spanish (Intermediate)"],
+    certifications: [
+      "TESOL Certification (2021)",
+      "State Teaching License (Grades 6-12) (2020)",
+      "Google Certified Educator Level 1 (2020)",
+    ],
     experiences: [
       {
         role: "English Teacher",
@@ -137,6 +143,7 @@ export default function ResumeBuilder() {
   const [skillInput, setSkillInput] = useState("");
   const [skillRating, setSkillRating] = useState(3);
   const [languageInput, setLanguageInput] = useState("");
+  const [certificationInput, setCertificationInput] = useState("");
   const previewRef = useRef<HTMLDivElement>(null);
   const previewHeaderRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<"upload" | "manual">("upload");
@@ -211,6 +218,9 @@ export default function ResumeBuilder() {
         skills: normalizedSkills,
         languages: Array.isArray(resumeData.languages)
           ? (resumeData.languages as unknown[]).map((lang) => String(lang))
+          : [],
+        certifications: Array.isArray(resumeData.certifications)
+          ? (resumeData.certifications as unknown[]).map((cert) => String(cert))
           : [],
         experiences: Array.isArray(resumeData.experiences)
           ? (resumeData.experiences as unknown[]).map((exp) => ({
@@ -421,6 +431,24 @@ export default function ResumeBuilder() {
     }));
   };
 
+  const addCertification = () => {
+    const value = certificationInput.trim();
+    if (!value) return;
+    setForm((prev) =>
+      prev.certifications.some((cert) => cert.toLowerCase() === value.toLowerCase())
+        ? prev
+        : { ...prev, certifications: [...prev.certifications, value] }
+    );
+    setCertificationInput("");
+  };
+
+  const removeCertification = (certName: string) => {
+    setForm((prev) => ({
+      ...prev,
+      certifications: prev.certifications.filter((cert) => cert !== certName),
+    }));
+  };
+
   const handlePhotoUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -461,6 +489,7 @@ export default function ResumeBuilder() {
             languages: form.languages,
             experiences: form.experiences,
             education: form.education,
+            certifications: form.certifications,
           },
         };
 
@@ -643,6 +672,7 @@ export default function ResumeBuilder() {
               ...normalized,
               title: targetJobValue || normalized.title || prev.title,
               photo: normalized.photo || prev.photo,
+              summary: data.rewriteSummary || normalized.summary || prev.summary,
             }));
           } else if (targetJobValue) {
             setForm((prev) => ({
@@ -650,6 +680,11 @@ export default function ResumeBuilder() {
               title: targetJobValue,
             }));
           }
+        } else if (data.rewriteSummary) {
+          setForm((prev) => ({
+            ...prev,
+            summary: data.rewriteSummary,
+          }));
         } else if (targetJobValue) {
           setForm((prev) => ({
             ...prev,
@@ -716,6 +751,16 @@ export default function ResumeBuilder() {
       .map((lang) => safeString(lang))
       .filter(Boolean);
 
+    const certifications = safeArray(parsed.certifications)
+      .map((cert: any) => {
+        if (typeof cert === "string") return safeString(cert);
+        if (cert && typeof cert === "object") {
+          return safeString(cert?.name ?? cert?.title ?? cert?.certificate);
+        }
+        return "";
+      })
+      .filter(Boolean);
+
     const normalized: ResumeTemplate = {
       ...emptyState(templates[0]),
       name: safeString(parsed.name),
@@ -727,6 +772,7 @@ export default function ResumeBuilder() {
       summary: safeString(parsed.summary),
       skills,
       languages,
+      certifications,
       experiences,
       education,
     };
@@ -737,7 +783,8 @@ export default function ResumeBuilder() {
       normalized.summary ||
       normalized.skills.length ||
       normalized.experiences.length ||
-      normalized.education.length;
+      normalized.education.length ||
+      normalized.certifications.length;
 
     return hasCore ? normalized : null;
   };
@@ -843,6 +890,16 @@ export default function ResumeBuilder() {
               ))}
             </ul>
           </div>
+          {form.certifications.length > 0 && (
+            <div className={styles.sidebarBlock}>
+              <h4>CERTIFICATIONS</h4>
+              <ul>
+                {form.certifications.map((cert, idx) => (
+                  <li key={idx}>{cert}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className={styles.navyMain}>
@@ -954,6 +1011,16 @@ export default function ResumeBuilder() {
                 ))}
               </ul>
             </div>
+            {form.certifications.length > 0 && (
+              <div className={styles.cleanSection}>
+                <h4>Certifications</h4>
+                <ul>
+                  {form.certifications.map((cert, idx) => (
+                    <li key={idx}>{cert}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1030,6 +1097,16 @@ export default function ResumeBuilder() {
                 ))}
               </ul>
             </div>
+            {form.certifications.length > 0 && (
+              <div className={styles.slateSection}>
+                <h4>Certifications</h4>
+                <ul>
+                  {form.certifications.map((cert, idx) => (
+                    <li key={idx}>{cert}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1097,7 +1174,7 @@ export default function ResumeBuilder() {
                       onChange={(e) => {
                         setTargetJob(e.target.value);
                       }}
-                      placeholder="e.g. Frontend Developer or paste a short job summary"
+                      placeholder="e.g. High School English Teacher or paste a short job summary"
                       required
                     />
                   </div>
@@ -1239,7 +1316,7 @@ export default function ResumeBuilder() {
                         <input
                           className="form-control"
                           value={form.title}
-                          placeholder="Product Manager"
+                          placeholder="High School English Teacher"
                           onChange={(e) => updateField("title", e.target.value)}
                         />
                       </div>
@@ -1316,7 +1393,7 @@ export default function ResumeBuilder() {
                         <input
                           className={`form-control ${styles.skillInput}`}
                           value={skillInput}
-                          placeholder="e.g., React, SQL, Leadership"
+                          placeholder="e.g., Lesson Planning, Differentiated Instruction"
                           onChange={(e) => setSkillInput(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -1405,6 +1482,46 @@ export default function ResumeBuilder() {
                 </details>
 
                 <details className={styles.accordion}>
+                  <summary className={styles.accordionHeader}>Certifications</summary>
+                  <div className={styles.accordionBody}>
+                    <div className="form-group">
+                      <label>Certifications</label>
+                      <div className={styles.skillsRow}>
+                        <input
+                          className="form-control"
+                          value={certificationInput}
+                          placeholder="e.g., TESOL Certification"
+                          onChange={(e) => setCertificationInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCertification();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={addCertification}
+                        >
+                          Add
+                        </button>
+                      </div>
+                      <div className={styles.tagList}>
+                        {form.certifications.map((cert) => (
+                          <div key={cert} className={styles.tag}>
+                            <span>{cert}</span>
+                            <button type="button" onClick={() => removeCertification(cert)}>
+                              x
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </details>
+
+                <details className={styles.accordion}>
                   <summary className={styles.accordionHeader}>Experience</summary>
                   <div className={styles.accordionBody}>
                     <div className="form-group">
@@ -1418,7 +1535,7 @@ export default function ResumeBuilder() {
                                 className="form-control"
                                 value={exp.role}
                                 onChange={(e) => updateExperience(idx, "role", e.target.value)}
-                                placeholder="Job Title"
+                                placeholder="English Teacher"
                               />
                             </div>
                             <div className="form-group">
@@ -1427,7 +1544,7 @@ export default function ResumeBuilder() {
                                 className="form-control"
                                 value={exp.company}
                                 onChange={(e) => updateExperience(idx, "company", e.target.value)}
-                                placeholder="Company"
+                                placeholder="School Name"
                               />
                             </div>
                             <div className="form-group">
