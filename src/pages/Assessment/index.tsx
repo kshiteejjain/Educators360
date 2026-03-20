@@ -149,26 +149,34 @@ const buildPairedResponses = (
     })
     .join("\n\n");
 
+const getInlineClass = (value: string) => {
+  const cleaned = value.replace(/\*\*/g, "").trim();
+  if (/pillar\s*:?\s*$/i.test(cleaned)) return styles.questionCategory;
+  if (/^question\s*:/i.test(cleaned)) return styles.questionLabel;
+  return undefined;
+};
+
 const formatInline = (value: string) => {
-  const parts: Array<{ text: string; bold?: boolean }> = [];
+  const className = getInlineClass(value);
+  const parts: Array<{ text: string; bold?: boolean; className?: string }> = [];
   const regex = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(value))) {
     if (match.index > lastIndex) {
-      parts.push({ text: value.slice(lastIndex, match.index) });
+      parts.push({ text: value.slice(lastIndex, match.index), className });
     }
     const token = match[0];
     if (token.startsWith("**")) {
-      parts.push({ text: token.slice(2, -2), bold: true });
+      parts.push({ text: token.slice(2, -2), bold: true, className });
     } else {
-      parts.push({ text: token.slice(1, -1), bold: true });
+      parts.push({ text: token.slice(1, -1), bold: true, className });
     }
     lastIndex = match.index + token.length;
   }
   if (lastIndex < value.length) {
-    parts.push({ text: value.slice(lastIndex) });
+    parts.push({ text: value.slice(lastIndex), className });
   }
   return parts;
 };
@@ -176,9 +184,13 @@ const formatInline = (value: string) => {
 const renderInline = (value: string) =>
   formatInline(value).map((part, index) =>
     part.bold ? (
-      <strong key={`b-${index}`}>{part.text}</strong>
+      <strong key={`b-${index}`} className={part.className}>
+        {part.text}
+      </strong>
     ) : (
-      <span key={`t-${index}`}>{part.text}</span>
+      <span key={`t-${index}`} className={part.className}>
+        {part.text}
+      </span>
     )
   );
 
@@ -189,7 +201,7 @@ const renderPreservedText = (value: string) => {
       {lines.map((line, index) => (
         <span key={`preserve-${index}`}>
           {renderInline(line)}
-          {index < lines.length - 1 && <br />}
+          {index < lines.length - 1}
         </span>
       ))}
     </div>

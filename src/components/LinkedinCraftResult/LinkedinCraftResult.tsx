@@ -23,7 +23,7 @@ const listOrEmpty = (items?: string[]) =>
 
 export default function LinkedinCraftResult({ result, targetRole }: Props) {
   return (
-    <section className={styles.wrapper}>
+    <section id="linkedin-craft-result" className={styles.wrapper}>
       <div className={styles.hero}>
         <div>
           <p className={styles.kicker}>LinkedIn Profile Craft</p>

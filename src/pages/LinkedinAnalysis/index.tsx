@@ -378,6 +378,8 @@ export default function LinkedinAnalysis() {
     targetRole?: string;
   }>({});
   const { withLoader } = useLoader();
+  const resultsAnchorId = "linkedin-analysis-results";
+  const craftAnchorId = "linkedin-craft-result";
 
   const getAiModifications = () => {
     const modifications = analysisResult?.aiAnalysis?.modifications;
@@ -448,6 +450,18 @@ export default function LinkedinAnalysis() {
 
     void fetchProfile();
   }, []);
+
+  useEffect(() => {
+    const anchorId = analysisResult ? resultsAnchorId : craftResult ? craftAnchorId : "";
+    if (!anchorId || typeof window === "undefined") return;
+    const handle = window.requestAnimationFrame(() => {
+      const target = document.getElementById(anchorId);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [analysisResult, craftResult]);
 
   const handleSubmit = async (e: React.FormEvent, mode: "linkedin" | "noLinkedin") => {
     e.preventDefault();
@@ -801,7 +815,7 @@ export default function LinkedinAnalysis() {
 
       {/* Analysis Results */}
       {analysisResult && (
-        <div className={styles.resultsSection}>
+        <div id={resultsAnchorId} className={styles.resultsSection}>
           <div className={styles.resultsActions}>
           </div>
           <div className={styles.scoreCard}>

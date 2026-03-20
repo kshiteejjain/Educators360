@@ -121,6 +121,14 @@
   color: #475569;
 }
 
+.questionCategory {
+  display: none;
+}
+
+.questionLabel {
+  font-weight: 700;
+}
+
 .preserveText {
   white-space: pre-wrap;
   line-height: 1.55;
