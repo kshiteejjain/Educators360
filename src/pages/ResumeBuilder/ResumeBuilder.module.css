@@ -901,9 +901,18 @@
 }
 
 .navyWrapper {
+  --navy-sidebar-width: 240px;
+  --navy-sidebar-color: #0b2942;
   display: grid;
-  grid-template-columns: 240px 1fr;
-  background: var(--color-white);
+  grid-template-columns: var(--navy-sidebar-width) 1fr;
+  background: linear-gradient(
+    90deg,
+    var(--navy-sidebar-color) 0,
+    var(--navy-sidebar-color) var(--navy-sidebar-width),
+    #ffffff var(--navy-sidebar-width)
+  );
+  background-repeat: repeat-y;
+  background-size: 100% var(--navy-page-height);
   border: 1px solid var(--color-e5e7eb);
   border-radius: 5px;
   overflow: hidden;
@@ -924,7 +933,7 @@
 }
 
 .navySidebar {
-  background: #0b2942;
+  background: var(--navy-sidebar-color);
   color: var(--color-white);
   padding: 24px 20px;
   display: flex;
@@ -1088,6 +1097,9 @@
 
 .printArea {
   position: relative;
+  width: min(900px, 100%);
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .printArea ul li {
@@ -1128,5 +1140,17 @@
   .printArea {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    width: 210mm;
+    min-height: 297mm;
+  }
+
+  .navyWrapper {
+    min-height: 297mm;
+    background-repeat: repeat-y;
+    background-size: 100% 297mm;
+  }
+
+  .navySidebar {
+    min-height: 100%;
   }
 }

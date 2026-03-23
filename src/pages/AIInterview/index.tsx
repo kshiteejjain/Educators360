@@ -15,6 +15,7 @@ export default function AIInterview() {
     "idle"
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [eventLog, setEventLog] = useState<string[]>([]);
   const [lastUserAudioAt, setLastUserAudioAt] = useState<number | null>(null);
   const [lastAiAudioAt, setLastAiAudioAt] = useState<number | null>(null);
@@ -245,9 +246,17 @@ export default function AIInterview() {
     }),
     []
   );
+  const hasCriticalLog = useMemo(
+    () =>
+      eventLog.some((line) =>
+        line.toLowerCase().includes("interview ended unexpectedly")
+      ),
+    [eventLog]
+  );
 
   const startInterview = async () => {
     setErrorMessage(null);
+    setErrorDetail(null);
     setStatus("connecting");
     userEndedRef.current = false;
     setEventLog([]);
@@ -354,11 +363,14 @@ export default function AIInterview() {
           addLog("Interview ended by user.");
         } else {
           setStatus("error");
-          setErrorMessage(
-            "Interview ended unexpectedly. Check mic permission and agent setup."
-          );
+          const unexpectedMessage =
+            "Interview ended unexpectedly. Check mic permission and agent setup.";
+          setErrorMessage(unexpectedMessage);
+          const detail = `Code=${event.code} Reason=${event.reason || "n/a"} Clean=${event.wasClean}`;
+          setErrorDetail(detail);
+          addLog(unexpectedMessage);
           addLog(
-            `WebSocket closed unexpectedly. Code=${event.code} Reason=${event.reason || "n/a"} Clean=${event.wasClean}`
+            `WebSocket closed unexpectedly. ${detail}`
           );
         }
       };
@@ -366,6 +378,7 @@ export default function AIInterview() {
         setIsActive(false);
         setStatus("error");
         setErrorMessage("Connection to ElevenLabs failed.");
+        setErrorDetail(null);
         addLog("WebSocket error.");
       };
     } catch (error) {
@@ -374,6 +387,7 @@ export default function AIInterview() {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not start interview."
       );
+      setErrorDetail(null);
       addLog("Failed to start interview.");
     }
   };
@@ -549,7 +563,6 @@ export default function AIInterview() {
                         : "idle"}
                     </span>
                   </div>
-                  {errorMessage ? <div className={styles.error}>{errorMessage}</div> : null}
                 </div>
               </aside>
 
@@ -580,7 +593,21 @@ export default function AIInterview() {
                   </div>
                   <div className={styles.eventLog} role="log" aria-live="polite">
                     {eventLog.length ? (
-                      eventLog.map((line) => <div key={line}>{line}</div>)
+                      eventLog.map((line) => {
+                        const isCritical = line
+                          .toLowerCase()
+                          .includes("interview ended unexpectedly");
+                        return (
+                          <div
+                            key={line}
+                            className={`${styles.eventLogLine} ${
+                              isCritical ? styles.eventLogCritical : ""
+                            }`}
+                          >
+                            {line}
+                          </div>
+                        );
+                      })
                     ) : (
                       <div className={styles.eventLogEmpty}>No logs yet.</div>
                     )}
@@ -595,6 +622,22 @@ export default function AIInterview() {
                 </div>
               </main>
             </div>
+
+            {errorMessage ? (
+              <div className={styles.pageAlert}>
+                <div className={styles.pageAlertTitle}>
+                  Interview ended unexpectedly
+                </div>
+                <div className={styles.pageAlertBody}>
+                  {errorMessage} Contact{" "}
+                  <a href="tel:+918605434108">+91 86054 34108</a> to report this
+                  error.
+                </div>
+                {errorDetail ? (
+                  <div className={styles.pageAlertMeta}>{errorDetail}</div>
+                ) : null}
+              </div>
+            ) : null}
           </>
         )}
       </section>

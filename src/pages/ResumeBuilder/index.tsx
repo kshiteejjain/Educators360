@@ -524,6 +524,24 @@ export default function ResumeBuilder() {
         const target = previewRef.current;
         if (!target) return;
 
+        const pageWidth = 595.28; // A4 width in points
+        const pageHeight = 841.89; // A4 height in points
+        const a4Ratio = pageHeight / pageWidth;
+        const targetWidth = target.scrollWidth || target.offsetWidth || 1;
+        const pageHeightPx = Math.floor(targetWidth * a4Ratio);
+        const totalPages = Math.max(1, Math.ceil(target.scrollHeight / pageHeightPx));
+        const totalHeightPx = totalPages * pageHeightPx;
+
+        const previousMinHeight = target.style.minHeight;
+        const previousPageHeight = target.style.getPropertyValue("--navy-page-height");
+        const previousOverflow = target.style.overflow;
+
+        if (previewTemplate === "navy") {
+          target.style.minHeight = `${totalHeightPx}px`;
+          target.style.setProperty("--navy-page-height", `${pageHeightPx}px`);
+          target.style.overflow = "hidden";
+        }
+
         const canvas = await html2canvas(target, {
           useCORS: true,
           scale: 2,
@@ -533,22 +551,64 @@ export default function ResumeBuilder() {
           scrollY: -window.scrollY,
         });
 
-        const pageWidth = 595.28; // A4 width in points
-        const renderHeight = (canvas.height * pageWidth) / canvas.width;
         const pdf = new jsPDF({
           orientation: "portrait",
           unit: "pt",
-          format: [pageWidth, renderHeight],
+          format: [pageWidth, pageHeight],
         });
 
-        pdf.addImage(
-          canvas.toDataURL("image/png"),
-          "PNG",
-          0,
-          0,
-          pageWidth,
-          renderHeight
-        );
+        const pageHeightPxCanvas = Math.floor((pageHeight * canvas.width) / pageWidth);
+        const pageCanvas = document.createElement("canvas");
+        const pageCtx = pageCanvas.getContext("2d");
+        if (!pageCtx) {
+          throw new Error("Canvas 2D context not available.");
+        }
+
+        let offsetY = 0;
+        let pageIndex = 0;
+        while (offsetY < canvas.height) {
+          const sliceHeight = Math.min(pageHeightPxCanvas, canvas.height - offsetY);
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = sliceHeight;
+          pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+          pageCtx.drawImage(
+            canvas,
+            0,
+            offsetY,
+            canvas.width,
+            sliceHeight,
+            0,
+            0,
+            canvas.width,
+            sliceHeight
+          );
+
+          const pageRenderHeight = (sliceHeight * pageWidth) / canvas.width;
+          if (pageIndex > 0) {
+            pdf.addPage([pageWidth, pageHeight], "p");
+          }
+          pdf.addImage(
+            pageCanvas.toDataURL("image/png"),
+            "PNG",
+            0,
+            0,
+            pageWidth,
+            pageRenderHeight
+          );
+
+          offsetY += sliceHeight;
+          pageIndex += 1;
+        }
+
+        if (previewTemplate === "navy") {
+          target.style.minHeight = previousMinHeight;
+          if (previousPageHeight) {
+            target.style.setProperty("--navy-page-height", previousPageHeight);
+          } else {
+            target.style.removeProperty("--navy-page-height");
+          }
+          target.style.overflow = previousOverflow;
+        }
 
         const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
         const roleSlug = (form.title || selectedTemplate.title || "role")
@@ -827,12 +887,13 @@ export default function ResumeBuilder() {
   const renderNavyTemplate = () => {
     const photoSrc = resolvePhotoSrc(form.photo);
     return (
-      <div ref={previewRef} className={styles.navyWrapper} data-resume-template="navy">
-        <div
-          className={styles.navySidebar}
-          data-resume-sidebar
-          style={{ backgroundColor: form.sidebarColor || "#0b2942" }}
-        >
+      <div
+        ref={previewRef}
+        className={styles.navyWrapper}
+        data-resume-template="navy"
+        style={{ "--navy-sidebar-color": form.sidebarColor || "#0b2942" } as React.CSSProperties}
+      >
+        <div className={styles.navySidebar} data-resume-sidebar>
           <div
             className={styles.photoCircle}
             role="button"

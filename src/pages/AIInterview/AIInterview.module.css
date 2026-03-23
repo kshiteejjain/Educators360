@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 16px;
   font-family: "Sora", "Manrope", sans-serif;
+  min-height: 100vh;
 }
 
 .headerRow {
@@ -84,6 +85,8 @@
   grid-template-columns: minmax(240px, 320px) 1fr;
   gap: 18px;
   align-items: stretch;
+  flex: 1;
+  min-height: 70vh;
 }
 
 .agentPanel {
@@ -92,6 +95,8 @@
   padding: 18px;
   color: #f9fafb;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.3);
+  display: flex;
+  height: 100%;
 }
 
 .agentCard {
@@ -100,6 +105,7 @@
   align-items: center;
   gap: 12px;
   min-height: 100%;
+  flex: 1;
 }
 
 .agentAvatar {
@@ -177,6 +183,7 @@
   flex-direction: column;
   gap: 16px;
   min-height: 520px;
+  height: 100%;
 }
 
 .chatHeader h3 {
@@ -492,6 +499,17 @@
   overflow: auto;
 }
 
+.eventLogLine {
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.eventLogCritical {
+  background: #b91c1c;
+  color: #fff;
+  font-weight: 600;
+}
+
 .eventLogBlock {
   display: flex;
   flex-direction: column;
@@ -527,6 +545,41 @@
   font-style: italic;
 }
 
+.pageAlert {
+  margin-top: 18px;
+  background: var(--color-error);
+  color: var(--color-white);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  box-shadow: 0 14px 28px rgba(185, 28, 28, 0.25);
+}
+
+.pageAlertTitle {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 12px;
+}
+
+.pageAlertBody {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pageAlertBody a {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.pageAlertMeta {
+  font-size: 12px;
+  opacity: 0.9;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
 
 .speakingRow {
   display: grid;

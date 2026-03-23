@@ -42,6 +42,19 @@ export default function Dashboard() {
   const [userCount, setUserCount] = useState<number>(0);
   const [activeMembers, setActiveMembers] = useState<Member[]>([]);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [sessionLogs, setSessionLogs] = useState<string[]>([
+    "[3:51:35 PM] Starting interview...",
+    "[3:51:35 PM] Signed URL received.",
+    "[3:51:36 PM] WebSocket connected.",
+    "[3:51:36 PM] Sent conversation init payload.",
+    "[3:51:36 PM] Audio formats negotiated. input=16000 output=16000",
+    "[3:51:36 PM] WS event: conversation_initiation_metadata",
+    "[3:51:36 PM] Audio worklet loaded.",
+    "[3:51:36 PM] Microphone streaming started.",
+    "[3:51:36 PM] WS event: agent_response",
+    "[3:51:37 PM] WebSocket closed unexpectedly. Code=1002 Reason=This request exceeds your quota limit. Clean=true",
+    "[3:56:02 PM] Interview ended unexpectedly. Check mic permission and agent setup.",
+  ]);
   const { withLoader } = useLoader();
 
   useEffect(() => {
@@ -420,6 +433,50 @@ export default function Dashboard() {
               )}
             </div>
           )}
+        </div>
+
+        <div className={styles.sessionLogsSection}>
+          <div className={styles.sessionLogsHeader}>
+            <div>
+              <h2>AI Interview</h2>
+              <p className={styles.sessionLogsSubtitle}>Session Logs</p>
+            </div>
+            <button
+              type="button"
+              className={styles.clearButton}
+              onClick={() => setSessionLogs([])}
+            >
+              Clear
+            </button>
+          </div>
+          <div className={styles.sessionLogsBody}>
+            {sessionLogs.length === 0 ? (
+              <p className={styles.loadingText}>No logs yet.</p>
+            ) : (
+              <ul className={styles.sessionLogsList}>
+                {sessionLogs.map((line, index) => (
+                  <li
+                    key={`${line}-${index}`}
+                    className={
+                      line.toLowerCase().includes("interview ended unexpectedly")
+                        ? styles.sessionLogCritical
+                        : line.toLowerCase().includes("closed") ||
+                          line.toLowerCase().includes("quota")
+                        ? styles.sessionLogError
+                        : styles.sessionLogItem
+                    }
+                  >
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className={styles.sessionLogsContact}>
+            <span>Need help? </span>
+            <a href="tel:+918605434108">+91 86054 34108</a>
+            <span> to contact and report error.</span>
+          </div>
         </div>
 
         {/* Quick Tips / Resources */}

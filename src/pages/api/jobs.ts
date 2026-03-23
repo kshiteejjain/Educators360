@@ -15,7 +15,14 @@ type JobItem = {
 const fetchJson = async <T>(url: string, headers?: Record<string, string>) => {
   const response = await fetch(url, { headers });
   if (!response.ok) {
-    throw new Error(`Request failed ${response.status} for ${url}`);
+    let detail = "";
+    try {
+      const bodyText = await response.text();
+      detail = bodyText ? ` - ${bodyText.slice(0, 300)}` : "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(`Request failed ${response.status} for ${url}${detail}`);
   }
   return (await response.json()) as T;
 };

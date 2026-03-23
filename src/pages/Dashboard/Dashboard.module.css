@@ -724,6 +724,106 @@
   padding: 20px;
 }
 
+/* Session Logs */
+.sessionLogsSection {
+  margin-top: 40px;
+  background: var(--color-white);
+  border-radius: 16px;
+  border: 1px solid var(--color-e5e7eb);
+  padding: 24px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.sessionLogsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sessionLogsHeader h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--color-gray);
+}
+
+.sessionLogsSubtitle {
+  margin: 4px 0 0;
+  color: var(--color-6b7280);
+  font-size: 0.9rem;
+}
+
+.clearButton {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clearButton:hover {
+  background: #fecaca;
+  border-color: #fca5a5;
+}
+
+.sessionLogsBody {
+  background: #0f172a;
+  border-radius: 12px;
+  padding: 18px;
+  color: #e2e8f0;
+}
+
+.sessionLogsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.sessionLogItem {
+  color: #cbd5f5;
+}
+
+.sessionLogError {
+  color: #fca5a5;
+}
+
+.sessionLogCritical {
+  color: #ffffff;
+  background: #b91c1c;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.sessionLogsContact {
+  margin-top: 14px;
+  font-size: 0.9rem;
+  color: var(--color-6b7280);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sessionLogsContact a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.sessionLogsContact a:hover {
+  text-decoration: underline;
+}
+
 /* Tips Section */
 .tipsSection {
   margin-top: 40px;
@@ -807,6 +907,16 @@
   .table th,
   .table td {
     padding: 8px 6px;
+  }
+
+  .sessionLogsHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .clearButton {
+    width: 100%;
+    text-align: center;
   }
 }
 
