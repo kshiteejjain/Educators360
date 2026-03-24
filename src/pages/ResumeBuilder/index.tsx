@@ -269,6 +269,7 @@ export default function ResumeBuilder() {
     }
   }, []);
 
+
   useEffect(() => {
     if (typeof window === "undefined" || hasHydratedTargetRole.current) return;
     const session = getSession();
@@ -512,11 +513,6 @@ export default function ResumeBuilder() {
           }
         }
 
-        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-          import("html2canvas"),
-          import("jspdf"),
-        ]);
-
         if ("fonts" in document) {
           await (document as Document & { fonts: FontFaceSet }).fonts.ready;
         }
@@ -524,97 +520,69 @@ export default function ResumeBuilder() {
         const target = previewRef.current;
         if (!target) return;
 
-        const pageWidth = 595.28; // A4 width in points
-        const pageHeight = 841.89; // A4 height in points
-        const a4Ratio = pageHeight / pageWidth;
-        const targetWidth = target.scrollWidth || target.offsetWidth || 1;
-        const pageHeightPx = Math.floor(targetWidth * a4Ratio);
-        const totalPages = Math.max(1, Math.ceil(target.scrollHeight / pageHeightPx));
-        const totalHeightPx = totalPages * pageHeightPx;
-
-        const previousMinHeight = target.style.minHeight;
-        const previousPageHeight = target.style.getPropertyValue("--navy-page-height");
-        const previousOverflow = target.style.overflow;
-
-        if (previewTemplate === "navy") {
-          target.style.minHeight = `${totalHeightPx}px`;
-          target.style.setProperty("--navy-page-height", `${pageHeightPx}px`);
-          target.style.overflow = "hidden";
-        }
-
-        const canvas = await html2canvas(target, {
-          useCORS: true,
-          scale: 2,
-          backgroundColor: "#ffffff",
-          windowWidth: target.scrollWidth,
-          windowHeight: target.scrollHeight,
-          scrollY: -window.scrollY,
-        });
-
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "pt",
-          format: [pageWidth, pageHeight],
-        });
-
-        const pageHeightPxCanvas = Math.floor((pageHeight * canvas.width) / pageWidth);
-        const pageCanvas = document.createElement("canvas");
-        const pageCtx = pageCanvas.getContext("2d");
-        if (!pageCtx) {
-          throw new Error("Canvas 2D context not available.");
-        }
-
-        let offsetY = 0;
-        let pageIndex = 0;
-        while (offsetY < canvas.height) {
-          const sliceHeight = Math.min(pageHeightPxCanvas, canvas.height - offsetY);
-          pageCanvas.width = canvas.width;
-          pageCanvas.height = sliceHeight;
-          pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
-          pageCtx.drawImage(
-            canvas,
-            0,
-            offsetY,
-            canvas.width,
-            sliceHeight,
-            0,
-            0,
-            canvas.width,
-            sliceHeight
-          );
-
-          const pageRenderHeight = (sliceHeight * pageWidth) / canvas.width;
-          if (pageIndex > 0) {
-            pdf.addPage([pageWidth, pageHeight], "p");
-          }
-          pdf.addImage(
-            pageCanvas.toDataURL("image/png"),
-            "PNG",
-            0,
-            0,
-            pageWidth,
-            pageRenderHeight
-          );
-
-          offsetY += sliceHeight;
-          pageIndex += 1;
-        }
-
-        if (previewTemplate === "navy") {
-          target.style.minHeight = previousMinHeight;
-          if (previousPageHeight) {
-            target.style.setProperty("--navy-page-height", previousPageHeight);
-          } else {
-            target.style.removeProperty("--navy-page-height");
-          }
-          target.style.overflow = previousOverflow;
-        }
-
         const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
         const roleSlug = (form.title || selectedTemplate.title || "role")
           .replace(/\s+/g, "-")
           .toLowerCase();
-        pdf.save(`${nameSlug}-${roleSlug}.pdf`);
+        const filename = `${nameSlug}-${roleSlug}.pdf`;
+        const resumeHtml = target.outerHTML;
+        const styleTags = Array.from(
+          document.querySelectorAll("style, link[rel=\"stylesheet\"]")
+        )
+          .map((node) => {
+            if (node.tagName.toLowerCase() === "style") {
+              return node.outerHTML;
+            }
+            const link = node as HTMLLinkElement;
+            if (!link.href) return "";
+            return `<link rel="stylesheet" href="${link.href}">`;
+          })
+          .filter(Boolean)
+          .join("\n");
+
+        const html = `<!doctype html><html><head>${styleTags}</head><body>${resumeHtml}</body></html>`;
+
+        const response = await fetch("/api/generate-pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            html,
+            filename,
+            baseUrl: window.location.origin,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+          console.error("PDF generation failed", {
+            status: response.status,
+            statusText: response.statusText,
+            errorText,
+          });
+          throw new Error("PDF generation failed.");
+        }
+
+        const contentType = response.headers.get("Content-Type") || "";
+        if (!contentType.includes("application/pdf")) {
+          const errorText = await response.text().catch(() => "");
+          console.error("Unexpected PDF response", {
+            contentType,
+            status: response.status,
+            statusText: response.statusText,
+            errorText,
+          });
+          throw new Error("PDF generation failed.");
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.URL.revokeObjectURL(url);
       }, "Saving and downloading your resume...");
       toast.success("Resume saved and downloaded.");
     } catch (err) {
@@ -978,8 +946,6 @@ export default function ResumeBuilder() {
             <div className={styles.resumeName}>{form.name}</div>
             <div className={styles.resumeTitle}>{form.title}</div>
           </div>
-
-          <div className={styles.divider} />
 
           <div className={styles.resumeSection}>
             <h4>PROFILE</h4>

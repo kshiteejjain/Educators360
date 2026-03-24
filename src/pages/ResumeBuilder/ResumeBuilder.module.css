@@ -520,7 +520,8 @@
   line-height: 1.6;
   width: 100%;
   box-sizing: border-box;
-  padding-bottom: 32px;
+  padding-bottom: 16px;
+  font-family: "Ubuntu", sans-serif;
 }
 
 .cleanHeader {
@@ -624,7 +625,8 @@
   line-height: 1.6;
   width: 100%;
   box-sizing: border-box;
-  padding-bottom: 32px;
+  padding-bottom: 16px;
+  font-family: "Ubuntu", sans-serif;
 }
 
 .slateHeader {
@@ -867,7 +869,7 @@
 }
 
 .resumeSection {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   break-inside: avoid;
   page-break-inside: avoid;
 }
@@ -877,6 +879,8 @@
   font-size: 13px;
   letter-spacing: 0.5px;
   color: var(--color-1f2937);
+  font-weight: 700;
+  font-family: inherit;
 }
 
 .resumeList {
@@ -884,7 +888,9 @@
   padding-left: 18px;
   margin: 0;
   color: var(--color-374151);
-  line-height: 1.6;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .resumeList li {
@@ -903,6 +909,7 @@
 .navyWrapper {
   --navy-sidebar-width: 240px;
   --navy-sidebar-color: #0b2942;
+  --navy-page-height: 1122px;
   display: grid;
   grid-template-columns: var(--navy-sidebar-width) 1fr;
   background: linear-gradient(
@@ -921,7 +928,9 @@
   width: 100%;
   align-items: stretch;
   box-sizing: border-box;
-  padding-bottom: 16px;
+  padding-bottom: 0;
+  min-height: var(--navy-page-height);
+  font-family: "Ubuntu", sans-serif;
 }
 
 .navyWrapper> :first-child {
@@ -938,10 +947,12 @@
   padding: 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   break-inside: avoid;
   page-break-inside: avoid;
   height: 100%;
+  min-height: 100%;
+  align-self: stretch;
 }
 
 .navySidebar h4 {
@@ -992,6 +1003,8 @@
   break-inside: avoid;
   page-break-inside: avoid;
   min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .navyHeaderText {
@@ -1100,10 +1113,11 @@
   width: min(900px, 100%);
   margin: 0 auto;
   box-sizing: border-box;
+  font-family: "Ubuntu", sans-serif;
 }
 
 .printArea ul li {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .downloadActions {
@@ -1114,6 +1128,38 @@
 
 .downloadResume {
   margin-top: 0;
+}
+
+@media print {
+  :global(body) {
+    margin: 0;
+  }
+
+  .navyWrapper,
+  .cleanWrapper,
+  .slateWrapper {
+    width: 210mm;
+    min-height: 297mm;
+  }
+
+  .navyWrapper {
+    background-repeat: repeat-y;
+    background-size: 100% var(--navy-page-height);
+  }
+
+  .resumeSection {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .cleanSection,
+  .slateSection {
+    page-break-inside: avoid;
+  }
+
+  :global(h4) {
+    page-break-after: avoid;
+  }
 }
 
 /* Print: hide controls, keep preview colors/layout */
@@ -1147,7 +1193,8 @@
   .navyWrapper {
     min-height: 297mm;
     background-repeat: repeat-y;
-    background-size: 100% 297mm;
+    --navy-page-height: 297mm;
+    background-size: 100% var(--navy-page-height);
   }
 
   .navySidebar {
