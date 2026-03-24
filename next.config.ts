@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
+  outputFileTracingIncludes: {
+    "/api/generate-pdf": ["./node_modules/@sparticuz/chromium/**"],
+  },
   images: {
     remotePatterns: [
       {
