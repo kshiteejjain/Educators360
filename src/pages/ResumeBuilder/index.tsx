@@ -736,9 +736,29 @@ export default function ResumeBuilder() {
     }
   };
 
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number, className?: string) => {
     const safe = Math.max(1, Math.min(5, Math.round(rating)));
-    return `${"★".repeat(safe)}${"☆".repeat(5 - safe)}`;
+    return (
+      <span
+        className={`${styles.starRow}${className ? ` ${className}` : ""}`}
+        aria-label={`${safe} out of 5`}
+      >
+        {Array.from({ length: 5 }, (_, idx) => {
+          const isFilled = idx < safe;
+          return (
+            <svg
+              key={`${idx}-${isFilled ? "filled" : "empty"}`}
+              className={`${styles.starIcon} ${isFilled ? styles.starFilled : styles.starEmpty}`}
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M12 3.4l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8 6.8 19.4l1-5.8-4.2-4.1 5.8-.8L12 3.4z" />
+            </svg>
+          );
+        })}
+      </span>
+    );
   };
 
   const renderAiItem = (item: unknown) => {
@@ -916,7 +936,7 @@ export default function ResumeBuilder() {
               {form.skills.map((skill, idx) => (
                 <li key={idx} className={styles.skillRow}>
                   <span className={styles.skillName}>{skill.name}</span>
-                  <span className={styles.skillStars}>{renderStars(skill.rating)}</span>
+                  {renderStars(skill.rating, styles.skillStars)}
                 </li>
               ))}
             </ul>
@@ -1025,7 +1045,7 @@ export default function ResumeBuilder() {
                 {form.skills.map((skill, idx) => (
                   <li key={idx} className={styles.skillRow}>
                     <span className={styles.skillName}>{skill.name}</span>
-                    <span className={styles.skillStars}>{renderStars(skill.rating)}</span>
+                    {renderStars(skill.rating, styles.skillStars)}
                   </li>
                 ))}
               </ul>
@@ -1111,7 +1131,7 @@ export default function ResumeBuilder() {
                 {form.skills.map((skill, idx) => (
                   <li key={idx} className={styles.skillRow}>
                     <span className={styles.skillName}>{skill.name}</span>
-                    <span className={styles.skillStars}>{renderStars(skill.rating)}</span>
+                    {renderStars(skill.rating, styles.skillStars)}
                   </li>
                 ))}
               </ul>
@@ -1458,7 +1478,7 @@ export default function ResumeBuilder() {
                         {form.skills.map((skill) => (
                           <div key={skill.name} className={styles.tag}>
                             <span>{skill.name}</span>
-                            <span className={styles.starText}>{renderStars(skill.rating)}</span>
+                            {renderStars(skill.rating, styles.starText)}
                             <select
                               className={styles.ratingSelectSmall}
                               value={skill.rating}

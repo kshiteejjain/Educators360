@@ -794,6 +794,30 @@
   font-size: 12px;
 }
 
+.starRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.starIcon {
+  width: 0.9em;
+  height: 0.9em;
+  display: block;
+}
+
+.starFilled {
+  fill: #f59e0b;
+  stroke: none;
+}
+
+.starEmpty {
+  fill: transparent;
+  stroke: #f59e0b;
+  stroke-width: 1.6;
+}
+
 .tag button {
   border: none;
   background: transparent;
@@ -813,7 +837,6 @@
 }
 
 .skillStars {
-  color: #f59e0b;
   font-size: 12px;
   white-space: nowrap;
 }
