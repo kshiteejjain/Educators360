@@ -50,10 +50,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       filename: safeFilename,
       baseUrl: baseUrl || null,
     });
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
+    } catch (launchError) {
+      // Fallback for serverless environments that don't have Chrome installed.
+      const chromium = await import("@sparticuz/chromium");
+      const puppeteerCore = await import("puppeteer-core");
+      browser = await puppeteerCore.launch({
+        args: chromium.default.args,
+        defaultViewport: chromium.default.defaultViewport,
+        executablePath: await chromium.default.executablePath(),
+        headless: chromium.default.headless,
+      });
+      // Re-throw if fallback also fails.
+      if (!browser) {
+        throw launchError;
+      }
+    }
     const page = await browser.newPage();
     await page.setViewport({ width: 794, height: 1122 });
     await page.setContent(htmlWithBase, { waitUntil: "networkidle0" });
