@@ -271,15 +271,26 @@ const renderRichText = (value: string) => {
 type ScorecardChartProps = {
   labels: string[];
   values: number[];
+  onImageReady?: (dataUrl: string) => void;
 };
 
-const ScorecardChart = ({ labels, values }: ScorecardChartProps) => {
+const ScorecardChart = ({ labels, values, onImageReady }: ScorecardChartProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart<"bar"> | null>(null);
+  const captureTimeoutRef = useRef<number | null>(null);
+  const onImageReadyRef = useRef<ScorecardChartProps["onImageReady"]>(onImageReady);
+
+  useEffect(() => {
+    onImageReadyRef.current = onImageReady;
+  }, [onImageReady]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
     if (chartRef.current) chartRef.current.destroy();
+    if (captureTimeoutRef.current) {
+      window.clearTimeout(captureTimeoutRef.current);
+      captureTimeoutRef.current = null;
+    }
 
     const data: ChartData<"bar"> = {
       labels,
@@ -303,6 +314,12 @@ const ScorecardChart = ({ labels, values }: ScorecardChartProps) => {
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: "x",
+        animation: {
+          onComplete: () => {
+            if (!onImageReadyRef.current || !chartRef.current) return;
+            onImageReadyRef.current(chartRef.current.toBase64Image());
+          },
+        },
         scales: {
           x: {
             type: "category",
@@ -337,7 +354,19 @@ const ScorecardChart = ({ labels, values }: ScorecardChartProps) => {
     };
 
     chartRef.current = new Chart(canvasRef.current, config);
-    return () => chartRef.current?.destroy();
+    if (onImageReadyRef.current) {
+      captureTimeoutRef.current = window.setTimeout(() => {
+        if (!chartRef.current) return;
+        onImageReadyRef.current?.(chartRef.current.toBase64Image());
+      }, 500);
+    }
+    return () => {
+      if (captureTimeoutRef.current) {
+        window.clearTimeout(captureTimeoutRef.current);
+        captureTimeoutRef.current = null;
+      }
+      chartRef.current?.destroy();
+    };
   }, [labels.join("|"), values.join("|")]);
 
   return (
@@ -488,28 +517,286 @@ const markdownToHtml = (value: string) => {
   return htmlBlocks.join("");
 };
 
-const buildReportHtml = (text: string) => {
-  if (!text) return "";
-  const htmlBody = markdownToHtml(text);
+const escapeXml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
+type DocxRun = { text: string; bold?: boolean };
+type DocxParagraph =
+  | { type: "heading"; level: number; runs: DocxRun[] }
+  | { type: "bullet"; runs: DocxRun[] }
+  | { type: "paragraph"; runs: DocxRun[] }
+  | { type: "blank" };
+
+const parseBoldRuns = (value: string) => {
+  const runs: DocxRun[] = [];
+  const regex = /\*\*([^*]+)\*\*/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(value))) {
+    if (match.index > lastIndex) {
+      runs.push({ text: value.slice(lastIndex, match.index) });
+    }
+    runs.push({ text: match[1], bold: true });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < value.length) {
+    runs.push({ text: value.slice(lastIndex) });
+  }
+  return runs;
+};
+
+const parseMarkdownToParagraphs = (text: string): DocxParagraph[] => {
+  const lines = text.split(/\r?\n/);
+  const blocks: DocxParagraph[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      blocks.push({ type: "blank" });
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      const level = Math.min(6, headingMatch[1].length);
+      blocks.push({
+        type: "heading",
+        level,
+        runs: parseBoldRuns(headingMatch[2]),
+      });
+      continue;
+    }
+
+    const bulletMatch = line.match(/^-+\s+(.*)$/);
+    if (bulletMatch) {
+      blocks.push({ type: "bullet", runs: parseBoldRuns(bulletMatch[1]) });
+      continue;
+    }
+
+    blocks.push({ type: "paragraph", runs: parseBoldRuns(line) });
+  }
+
+  return blocks;
+};
+
+const renderRunsXml = (runs: DocxRun[]) =>
+  runs
+    .map((run) => {
+      const text = escapeXml(run.text);
+      const bold = run.bold ? "<w:rPr><w:b /></w:rPr>" : "";
+      return `<w:r>${bold}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+    })
+    .join("");
+
+const buildDocxDocumentXml = (
+  text: string,
+  includeImage: boolean,
+  imageWidthEmu: number,
+  imageHeightEmu: number
+) => {
+  const paragraphs = parseMarkdownToParagraphs(text).map((block, index) => {
+    if (block.type === "blank") return `<w:p />`;
+    if (block.type === "heading") {
+      return `<w:p><w:pPr><w:pStyle w:val="Heading${block.level}" /></w:pPr>${renderRunsXml(
+        block.runs
+      )}</w:p>`;
+    }
+    if (block.type === "bullet") {
+      return `<w:p>${renderRunsXml([{ text: "• " }, ...block.runs])}</w:p>`;
+    }
+    return `<w:p>${renderRunsXml(block.runs)}</w:p>`;
+  });
+
+  const imageBlock = includeImage
+    ? `
+      <w:p>
+        <w:r>
+          <w:drawing>
+            <wp:inline distT="0" distB="0" distL="0" distR="0"
+              xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+              <wp:extent cx="${imageWidthEmu}" cy="${imageHeightEmu}" />
+              <wp:docPr id="1" name="Scorecard Chart" />
+              <wp:cNvGraphicFramePr>
+                <a:graphicFrameLocks noChangeAspect="1" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" />
+              </wp:cNvGraphicFramePr>
+              <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                    <pic:nvPicPr>
+                      <pic:cNvPr id="0" name="chart.png" />
+                      <pic:cNvPicPr />
+                    </pic:nvPicPr>
+                    <pic:blipFill>
+                      <a:blip r:embed="rId1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" />
+                      <a:stretch><a:fillRect /></a:stretch>
+                    </pic:blipFill>
+                    <pic:spPr>
+                      <a:xfrm>
+                        <a:off x="0" y="0" />
+                        <a:ext cx="${imageWidthEmu}" cy="${imageHeightEmu}" />
+                      </a:xfrm>
+                      <a:prstGeom prst="rect"><a:avLst /></a:prstGeom>
+                    </pic:spPr>
+                  </pic:pic>
+                </a:graphicData>
+              </a:graphic>
+            </wp:inline>
+          </w:drawing>
+        </w:r>
+      </w:p>
+    `
+    : "";
 
   return `
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body { font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; line-height: 1.6; }
-          h1 { font-size: 22px; margin: 0 0 12px; }
-          h2, h3, h4, h5, h6 { margin: 16px 0 8px; }
-          p { margin: 0 0 8px; }
-          .report-body { white-space: pre-wrap; }
-        </style>
-      </head>
-      <body>
-        <h1>Professional Growth Report</h1>
-        <div class="report-body">${htmlBody}</div>
-      </body>
-    </html>
-  `;
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+      xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+      xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+      <w:body>
+        <w:p>
+          <w:r>
+            <w:rPr><w:b /><w:sz w:val="32" /></w:rPr>
+            <w:t>Professional Growth Report</w:t>
+          </w:r>
+        </w:p>
+        ${imageBlock}
+        ${paragraphs.join("\n")}
+        <w:sectPr>
+          <w:pgSz w:w="12240" w:h="15840" />
+          <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0" />
+        </w:sectPr>
+      </w:body>
+    </w:document>
+  `.trim();
+};
+
+const buildDocxContentTypesXml = (includeImage: boolean) => `
+  <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />
+    <Default Extension="xml" ContentType="application/xml" />
+    ${includeImage ? '<Default Extension="png" ContentType="image/png" />' : ""}
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" />
+    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml" />
+  </Types>
+`.trim();
+
+const buildDocxRelsXml = () => `
+  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml" />
+  </Relationships>
+`.trim();
+
+const buildDocxDocumentRelsXml = (includeImage: boolean) => `
+  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    ${
+      includeImage
+        ? '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png" />'
+        : ""
+    }
+    <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" />
+  </Relationships>
+`.trim();
+
+const buildDocxStylesXml = () => `
+  <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+      <w:name w:val="Normal" />
+      <w:qFormat />
+      <w:rPr>
+        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" />
+        <w:sz w:val="22" />
+      </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading1">
+      <w:name w:val="heading 1" />
+      <w:basedOn w:val="Normal" />
+      <w:qFormat />
+      <w:rPr>
+        <w:b />
+        <w:sz w:val="32" />
+      </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading2">
+      <w:name w:val="heading 2" />
+      <w:basedOn w:val="Normal" />
+      <w:qFormat />
+      <w:rPr>
+        <w:b />
+        <w:sz w:val="28" />
+      </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading3">
+      <w:name w:val="heading 3" />
+      <w:basedOn w:val="Normal" />
+      <w:qFormat />
+      <w:rPr>
+        <w:b />
+        <w:sz w:val="26" />
+      </w:rPr>
+    </w:style>
+  </w:styles>
+`.trim();
+
+const getImageSize = (dataUrl: string) =>
+  new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.width, height: img.height });
+    img.onerror = () => reject(new Error("Failed to load chart image."));
+    img.src = dataUrl;
+  });
+
+const buildReportDocx = async (text: string, chartDataUrl?: string) => {
+  const JSZip = (await import("jszip")).default;
+  const includeImage = Boolean(chartDataUrl);
+  let widthEmu = 600 * 9525;
+  let heightEmu = 300 * 9525;
+
+  if (includeImage && chartDataUrl) {
+    try {
+      const size = await getImageSize(chartDataUrl);
+      const maxWidthEmu = Math.round(6.5 * 914400);
+      const targetWidthEmu = Math.round(size.width * 9525);
+      const targetHeightEmu = Math.round(size.height * 9525);
+      if (targetWidthEmu > maxWidthEmu) {
+        const ratio = maxWidthEmu / targetWidthEmu;
+        widthEmu = Math.round(targetWidthEmu * ratio);
+        heightEmu = Math.round(targetHeightEmu * ratio);
+      } else {
+        widthEmu = targetWidthEmu;
+        heightEmu = targetHeightEmu;
+      }
+    } catch {
+      // fallback to default sizes
+    }
+  }
+
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", buildDocxContentTypesXml(includeImage));
+  zip.folder("_rels")?.file(".rels", buildDocxRelsXml());
+  zip.folder("word")?.file("styles.xml", buildDocxStylesXml());
+  zip.folder("word")?.file(
+    "document.xml",
+    buildDocxDocumentXml(text, includeImage, widthEmu, heightEmu)
+  );
+  zip
+    .folder("word")
+    ?.folder("_rels")
+    ?.file("document.xml.rels", buildDocxDocumentRelsXml(includeImage));
+
+  if (includeImage && chartDataUrl) {
+    const base64 = chartDataUrl.split(",")[1] || "";
+    const binary = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    zip.folder("word")?.folder("media")?.file("image1.png", binary);
+  }
+
+  return zip.generateAsync({ type: "blob" });
 };
 
 export default function Assessment() {
@@ -520,10 +807,17 @@ export default function Assessment() {
   const [report, setReport] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const reportSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [speechError, setSpeechError] = useState<string>("");
+  const [reportChartDataUrl, setReportChartDataUrl] = useState("");
+  const handleChartImageReady = useMemo(
+    () => (dataUrl: string) =>
+      setReportChartDataUrl((prev) => (prev === dataUrl ? prev : dataUrl)),
+    []
+  );
 
   const recognitionRef = useRef<any>(null);
   const recordingQuestionIdRef = useRef<string | null>(null);
@@ -686,6 +980,11 @@ export default function Assessment() {
     () => extractScoreLines(report.split(/\r?\n/)),
     [report]
   );
+  useEffect(() => {
+    if (reportScoreLines.length === 0) {
+      setReportChartDataUrl("");
+    }
+  }, [reportScoreLines.length]);
 
   const handleStart = async (cardId: string) => {
     setError("");
@@ -748,13 +1047,19 @@ export default function Assessment() {
     setAnswers((prev) => ({ ...prev, [id]: value }));
   };
 
-  const downloadReportAsWord = () => {
-    const htmlContent = buildReportHtml(report);
-    const blob = new Blob([htmlContent], { type: "application/msword" });
+  const downloadReportAsWord = async () => {
+    let chartDataUrl = reportChartDataUrl;
+    if (!chartDataUrl && reportSectionRef.current) {
+      const canvas = reportSectionRef.current.querySelector("canvas");
+      if (canvas && typeof (canvas as HTMLCanvasElement).toDataURL === "function") {
+        chartDataUrl = (canvas as HTMLCanvasElement).toDataURL("image/png");
+      }
+    }
+    const blob = await buildReportDocx(report, chartDataUrl);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "assessment-report.doc";
+    a.download = "assessment-report.docx";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -918,12 +1223,12 @@ export default function Assessment() {
         )}
 
         {view === "report" && (
-          <div className={styles.reportSection}>
+          <div className={styles.reportSection} ref={reportSectionRef}>
             <div className={styles.questionsHeader}>
               <h2 className={styles.questionsTitle}>{"\u{1F4D8}"} Professional Growth Report</h2>
               <div className={styles.downloadButtons}>
                 <button type="button" className={styles.backButton} onClick={downloadReportAsWord}>
-                  Download Word
+                  Download Report
                 </button>
                 <button type="button" className={styles.backButton} onClick={handleBackToCards}>
                   Back to cards
@@ -950,6 +1255,7 @@ export default function Assessment() {
                       <ScorecardChart
                         labels={reportScoreLines.map((line) => line.label)}
                         values={reportScoreLines.map((line) => line.score)}
+                        onImageReady={handleChartImageReady}
                       />
                     </div>
                   )}

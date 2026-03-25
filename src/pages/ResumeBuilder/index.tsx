@@ -464,6 +464,25 @@ export default function ResumeBuilder() {
     reader.readAsDataURL(file);
   };
 
+  const getMissingRequiredSections = () => {
+    const hasSkills = form.skills.some((skill) => skill.name.trim());
+    const hasLanguages = form.languages.some((lang) => lang.trim());
+    const hasExperiences = form.experiences.some(
+      (exp) =>
+        exp.role.trim() || exp.company.trim() || exp.dates.trim() || exp.bullets.length > 0
+    );
+    const hasEducation = form.education.some(
+      (edu) => edu.school.trim() || edu.degree.trim() || edu.dates.trim()
+    );
+
+    const missing: string[] = [];
+    if (!hasSkills) missing.push("skills");
+    if (!hasLanguages) missing.push("languages");
+    if (!hasExperiences) missing.push("experience");
+    if (!hasEducation) missing.push("education");
+    return missing;
+  };
+
   const saveDownloadResume = async () => {
     if (!previewRef.current) return;
     const session = getSession();
@@ -472,6 +491,15 @@ export default function ResumeBuilder() {
       return;
     }
     if (isSaving) return;
+
+    const missingRequired = getMissingRequiredSections();
+    if (missingRequired.length > 0) {
+      const label = missingRequired.join(", ");
+      toast.error(
+        `Please add ${label} before saving your resume. All these sections are required.`
+      );
+      return;
+    }
 
     setIsSaving(true);
     try {

@@ -118,7 +118,7 @@
 
 .questionWhy {
   margin: 0 0 12px;
-  color: #475569;
+  color: var(--color-text);
 }
 
 .questionCategory {
@@ -137,7 +137,8 @@
 .richHeading {
   font-weight: 700;
   color: var(--color-text);
-  margin: 6px 0;
+  margin: 20px 0 0 0;
+  font-size: calc(var(--font-size-base) + 4px);
 }
 
 .richParagraph {
@@ -172,7 +173,7 @@
 
 .answerInputRecording {
   border-style: dashed;
-  border-color: #7c3aed;
+  border-color: var(--color-primary);
   animation: recordingGlow 1.2s infinite ease-in-out;
 }
 
@@ -191,7 +192,7 @@
   right: 10px;
   border: none;
   background: rgba(255, 255, 255, 0.85);
-  color: #1d4ed8;
+  color: var(--color-primary);
   padding: 6px 10px;
   border-radius: 999px;
   cursor: pointer;
@@ -219,7 +220,7 @@
   right: 10px;
   border: none;
   background: rgba(255, 255, 255, 0.85);
-  color: #1d4ed8;
+  color: var(--color-primary);
   padding: 6px 10px;
   border-radius: 999px;
   cursor: pointer;
@@ -342,7 +343,7 @@
 }
 
 .reportHero {
-  background: #ffffff;
+  background: var(--color-white);
   border-radius: 18px;
   padding: 18px 20px;
   border: 1px solid #e2e8f0;
@@ -358,7 +359,7 @@
 .reportHeroIcon {
   font-size: 28px;
   background: #e0e7ff;
-  color: #1d4ed8;
+  color: var(--color-primary);
   border-radius: 14px;
   padding: 8px 10px;
 }
@@ -366,7 +367,7 @@
 .reportHeroTitle {
   margin: 0 0 6px;
   font-size: 20px;
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .reportHeroSubtitle {
@@ -411,7 +412,7 @@
   padding: 4px 10px;
   border-radius: 999px;
   background: #e0e7ff;
-  color: #1d4ed8;
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -449,7 +450,7 @@
   white-space: nowrap;
 }
 .reportBulletIcon {
-  color: #1d4ed8;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
