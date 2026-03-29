@@ -166,6 +166,47 @@ export default function ResumeBuilder() {
   const hasHydratedResume = useRef(false);
   const hasHydratedTargetRole = useRef(false);
 
+  const applyNavyPageSpacing = () => {
+    const root = previewRef.current;
+    if (!root) return;
+    const navyWrapper =
+      root.querySelector<HTMLElement>("[data-resume-template=\"navy\"]") ??
+      root.querySelector<HTMLElement>(`.${styles.navyWrapper}`);
+    if (!navyWrapper) return;
+
+    const pageHeightRaw = getComputedStyle(navyWrapper).getPropertyValue("--navy-page-height");
+    const pageHeight = Number(pageHeightRaw.replace("px", "").trim());
+    if (!Number.isFinite(pageHeight) || pageHeight <= 0) return;
+
+    const navyMain =
+      navyWrapper.querySelector<HTMLElement>("[data-resume-main]") ??
+      navyWrapper.querySelector<HTMLElement>(`.${styles.navyMain}`);
+    if (!navyMain) return;
+    const navySidebar =
+      navyWrapper.querySelector<HTMLElement>("[data-resume-sidebar]") ??
+      navyWrapper.querySelector<HTMLElement>(`.${styles.navySidebar}`);
+    if (!navySidebar) return;
+
+    const blocks = navyMain.querySelectorAll<HTMLElement>("[data-page-block]");
+    blocks.forEach((block) => block.classList.remove("pageBreakStart"));
+
+    let lastPageIndex = 0;
+    blocks.forEach((block, index) => {
+      const top = block.offsetTop;
+      const pageIndex = Math.floor((top + 1) / pageHeight);
+      if (index > 0 && pageIndex > lastPageIndex) {
+        block.classList.add("pageBreakStart");
+      }
+      lastPageIndex = Math.max(lastPageIndex, pageIndex);
+    });
+
+    const contentHeight = Math.max(navyMain.scrollHeight, navySidebar.scrollHeight);
+    const pageCount = Math.max(1, Math.ceil(contentHeight / pageHeight));
+    const fullHeight = pageCount * pageHeight;
+    navyWrapper.style.minHeight = `${fullHeight}px`;
+    navySidebar.style.minHeight = `${fullHeight}px`;
+  };
+
   const scrollToPreviewHeader = () => {
     previewHeaderRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -178,6 +219,19 @@ export default function ResumeBuilder() {
       aiResultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [aiResult]);
+
+  useEffect(() => {
+    if (previewTemplate !== "navy") return;
+    const handle = () => {
+      window.requestAnimationFrame(() => applyNavyPageSpacing());
+    };
+    const raf = window.requestAnimationFrame(handle);
+    window.addEventListener("resize", handle);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", handle);
+    };
+  }, [previewTemplate, form]);
 
   useEffect(() => {
     if (typeof window === "undefined" || hasHydratedResume.current) return;
@@ -547,6 +601,9 @@ export default function ResumeBuilder() {
 
         const target = previewRef.current;
         if (!target) return;
+        if (previewTemplate === "navy") {
+          applyNavyPageSpacing();
+        }
 
         const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
         const roleSlug = (form.title || selectedTemplate.title || "role")
@@ -568,7 +625,7 @@ export default function ResumeBuilder() {
           .filter(Boolean)
           .join("\n");
 
-        const html = `<!doctype html><html><head>${styleTags}</head><body>${resumeHtml}</body></html>`;
+        const html = `<!doctype html><html class="pdf-export"><head>${styleTags}</head><body class="pdf-export">${resumeHtml}</body></html>`;
 
         const response = await fetch("/api/generate-pdf", {
           method: "POST",
@@ -580,26 +637,46 @@ export default function ResumeBuilder() {
           }),
         });
 
+        const parseErrorResponse = async () => {
+          const contentType = response.headers.get("Content-Type") || "";
+          if (contentType.includes("application/json")) {
+            const data = await response.json().catch(() => null);
+            if (data && typeof data === "object") {
+              const message =
+                "details" in data && typeof (data as any).details === "string"
+                  ? (data as any).details
+                  : "message" in data && typeof (data as any).message === "string"
+                    ? (data as any).message
+                    : "";
+              return { message, raw: JSON.stringify(data) };
+            }
+          }
+          const text = await response.text().catch(() => "");
+          return { message: text, raw: text };
+        };
+
         if (!response.ok) {
-          const errorText = await response.text().catch(() => "");
+          const error = await parseErrorResponse();
           console.error("PDF generation failed", {
             status: response.status,
             statusText: response.statusText,
-            errorText,
+            errorText: error.raw,
           });
-          throw new Error("PDF generation failed.");
+          const details = error.message || response.statusText || "Unknown error";
+          throw new Error(`PDF generation failed (${response.status}): ${details}`);
         }
 
         const contentType = response.headers.get("Content-Type") || "";
         if (!contentType.includes("application/pdf")) {
-          const errorText = await response.text().catch(() => "");
+          const error = await parseErrorResponse();
           console.error("Unexpected PDF response", {
             contentType,
             status: response.status,
             statusText: response.statusText,
-            errorText,
+            errorText: error.raw,
           });
-          throw new Error("PDF generation failed.");
+          const details = error.message || "Unexpected response from server";
+          throw new Error(`PDF generation failed (${response.status}): ${details}`);
         }
 
         const blob = await response.blob();
@@ -615,7 +692,11 @@ export default function ResumeBuilder() {
       toast.success("Resume saved and downloaded.");
     } catch (err) {
       console.error("Failed to save resume or generate PDF", err);
-      toast.error("Could not save or download the resume. Please try again.");
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not save or download the resume. Please try again.";
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -989,24 +1070,24 @@ export default function ResumeBuilder() {
           )}
         </div>
 
-        <div className={styles.navyMain}>
-          <div className={styles.navyHeaderText}>
+        <div className={styles.navyMain} data-resume-main>
+          <div className={styles.navyHeaderText} data-page-block>
             <div className={styles.resumeName}>{form.name}</div>
             <div className={styles.resumeTitle}>{form.title}</div>
           </div>
 
-          <div className={styles.resumeSection}>
+          <div className={styles.resumeSection} data-page-block>
             <h4>PROFILE</h4>
             <div className={styles.resumeList} style={{ listStyle: "none", paddingLeft: 0 }}>
               <div>{form.summary}</div>
             </div>
           </div>
 
-          <div className={styles.resumeSection}>
+          <div className={styles.resumeSection} data-page-block>
             <h4>WORK EXPERIENCE</h4>
             <ul className={styles.resumeList}>
               {form.experiences.map((exp, idx) => (
-                <li key={idx}>
+                <li key={idx} data-page-block>
                   <div className={styles.resumeItemTitle}>{exp.company}</div>
                   <div className={styles.resumeTitleSmall}>{exp.role}</div>
                   <div className={styles.resumeMeta}>{exp.dates}</div>
@@ -1038,7 +1119,6 @@ export default function ResumeBuilder() {
           <div className={`${styles.cleanMeta} ${styles.personalMeta}`}>
             <span>✉ {form.email}</span>
             <span>☎ {form.phone}</span>
-            <span>📍 {form.location}</span>
           </div>
         </div>
 
@@ -1067,9 +1147,9 @@ export default function ResumeBuilder() {
             </div>
           </div>
           <div>
-            <div className={styles.cleanSection}>
+            <div className={`${styles.cleanSection} ${styles.skillsSection}`}>
               <h4>Skills</h4>
-              <ul>
+              <ul className={styles.slateSkillsList}>
                 {form.skills.map((skill, idx) => (
                   <li key={idx} className={styles.skillRow}>
                     <span className={styles.skillName}>{skill.name}</span>
@@ -1153,9 +1233,9 @@ export default function ResumeBuilder() {
             </div>
           </div>
           <div>
-            <div className={styles.slateSection}>
+            <div className={`${styles.slateSection} ${styles.skillsSection}`}>
               <h4>Skills</h4>
-              <ul>
+              <ul className={styles.slateSkillsList}>
                 {form.skills.map((skill, idx) => (
                   <li key={idx} className={styles.skillRow}>
                     <span className={styles.skillName}>{skill.name}</span>

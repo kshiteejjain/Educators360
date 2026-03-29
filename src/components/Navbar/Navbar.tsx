@@ -25,6 +25,11 @@ export default function Navbar() {
       setPageTitle("Project Details");
       return;
     }
+    if (pathname === "/JobDetails/[jobId]") {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      setPageTitle("Job Details");
+      return;
+    }
     const title =
       segment
         .replace(/([A-Z])/g, " $1")

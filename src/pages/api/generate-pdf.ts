@@ -75,6 +75,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await page.setContent(htmlWithBase, { waitUntil: "networkidle0" });
     await page.emulateMediaType("print");
 
+    await page.evaluate(() => {
+      const navyWrapper = document.querySelector<HTMLElement>("[data-resume-template=\"navy\"]");
+      if (!navyWrapper) {
+        return;
+      }
+      const navyMain = navyWrapper.querySelector<HTMLElement>("[data-resume-main]");
+      const navySidebar = navyWrapper.querySelector<HTMLElement>("[data-resume-sidebar]");
+      if (!navyMain || !navySidebar) {
+        return;
+      }
+
+      const pageHeightRaw = getComputedStyle(navyWrapper).getPropertyValue("--navy-page-height");
+      const pageHeight = Number(pageHeightRaw.replace("px", "").trim());
+      if (!Number.isFinite(pageHeight) || pageHeight <= 0) {
+        return;
+      }
+
+      const blocks = navyMain.querySelectorAll<HTMLElement>("[data-page-block]");
+      blocks.forEach((block) => block.classList.remove("pageBreakStart"));
+
+      let lastPageIndex = 0;
+      blocks.forEach((block, index) => {
+        const top = block.offsetTop;
+        const pageIndex = Math.floor((top + 1) / pageHeight);
+        if (index > 0 && pageIndex > lastPageIndex) {
+          block.classList.add("pageBreakStart");
+        }
+        lastPageIndex = Math.max(lastPageIndex, pageIndex);
+      });
+
+      const contentHeight = Math.max(navyMain.scrollHeight, navySidebar.scrollHeight);
+      const pageCount = Math.max(1, Math.ceil(contentHeight / pageHeight));
+      const fullHeight = pageCount * pageHeight;
+      navyWrapper.style.minHeight = `${fullHeight}px`;
+      navySidebar.style.minHeight = `${fullHeight}px`;
+    });
+
     try {
       await page.waitForSelector("img", { timeout: 5000 });
       await page.evaluate(async () => {

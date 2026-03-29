@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createChatCompletion, OpenAIRequestError } from "@/utils/openai";
+import { OpenAIRequestError } from "@/utils/openai";
+import type { ResumeTemplate } from "@/types/resume"; // Add the correct import path for ResumeTemplate
 
 type AiResumeResult = {
   score: number;
@@ -25,17 +26,21 @@ type AiResumeResult = {
   };
 };
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
 const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: string) => {
   const targetLine = targetJob ? `Target job: ${targetJob}` : "Target job: Not provided";
   const jobDescLine = jobDescription
     ? `Job description:\n${jobDescription}`
     : "Job description: Not provided";
+
   return [
     "You are an expert resume coach.",
     "Analyze the resume text and provide improvement feedback.",
-    "Use the target job to tailor the rewritten profile summary. If target job is provided, rewriteSummary must be aligned to that role while remaining truthful to the resume content.",
+    "Use the target job to tailor the rewritten profile summary. If the target job is provided, rewriteSummary must be aligned to that role while remaining truthful to the resume content.",
     "Extract and populate the parsedResume strictly from the resume content. Do not omit sections that exist; use empty strings only if truly missing.",
-    "For experiences: split each distinct company/role/date range into its own item. Do NOT merge multiple jobs into one. If dates or companies change, start a new experience entry.",
+    "For experiences: split each distinct company/role/date range into its own item. Do NOT merge multiple jobs into one. If dates or companies change, start a new experience entry. Please treat the following companies as distinct, even if they have similar job roles or overlapping dates",
     "Return STRICT JSON only, no extra text, using this schema:",
     `{
   "score": 0-100,
@@ -68,10 +73,157 @@ const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: st
   ].join("\n");
 };
 
+interface ResumeTemplate {
+  name: string;
+  title: string;
+  location: string;
+  email: string;
+  phone: string;
+  photo?: string;
+  summary: string;
+  skills: { name: string; rating: number }[];
+  languages: string[];
+  experiences: { role: string; company: string; dates: string; bullets: string[] }[];
+  education: { school: string; degree: string; dates: string }[];
+  projects: { name: string; dates: string; summary: string; tech: string }[];
+}
+
+const emptyState = (template: any): ResumeTemplate => {
+  return {
+    name: '',
+    title: '',
+    location: '',
+    email: '',
+    phone: '',
+    photo: '',
+    summary: '',
+    skills: [],
+    languages: [],
+    experiences: [],
+    education: [],
+    projects: [],
+    ...template,  // Spread to include the template structure, if required
+  };
+};
+
+const templates = [
+  {
+    name: '',
+    title: '',
+    location: '',
+    email: '',
+    phone: '',
+    photo: '',
+    summary: '',
+    skills: [],
+    languages: [],
+    experiences: [],
+    education: [],
+    projects: [],
+  },
+];
+
+// Safely handle strings (returns an empty string if the value is not a string)
+const safeString = (value: unknown): string => {
+  return typeof value === 'string' ? value.trim() : ''; // If it's a string, trim it; otherwise return an empty string
+};
+
+// Safely handle arrays (returns an empty array if the value is not an array)
+const safeArray = <T>(value: unknown): T[] => {
+  return Array.isArray(value) ? value : []; // If it's an array, return it; otherwise return an empty array
+};
+
+const normalizeParsedResume = (parsed?: ResumeTemplate): ResumeTemplate | null => {
+  if (!parsed) return null;
+
+  // Process experiences, ensuring clear separation of roles and companies
+  const experiences = safeArray(parsed.experiences)
+    .map((exp: any) => ({
+      role: safeString(exp?.role),
+      company: safeString(exp?.company),  // Ensure company names are separate
+      dates: safeString(exp?.dates),
+      bullets: safeArray(exp?.bullets).map((bullet) => safeString(bullet)).filter(Boolean),
+    }))
+    .filter((exp) => exp.role || exp.company || exp.dates || exp.bullets.length > 0);
+
+  // Ensure that experiences with different companies are treated separately
+  const distinctExperiences = experiences.filter((exp, index, self) => {
+    const companyRoleCombination = `${exp.company} ${exp.role}`;
+    const previousCompanyRoleCombination = `${self[index - 1]?.company} ${self[index - 1]?.role}`;
+
+    // If the combination of company and role is different, treat it as a separate experience
+    return companyRoleCombination !== previousCompanyRoleCombination;
+  });
+
+  const normalized: ResumeTemplate = {
+    ...emptyState(templates[0]),
+    experiences: distinctExperiences, // Return the separate experiences
+  };
+
+  return normalized;
+};
+
+const callGemini = async (prompt: string) => {
+  if (!GEMINI_API_KEY) {
+    throw new OpenAIRequestError(500, "Missing GEMINI_API_KEY");
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("Gemini error response", {
+      status: response.status,
+      body: errText,
+    });
+    throw new OpenAIRequestError(response.status, "AI service error.", errText);
+  }
+
+  const data = (await response.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+  if (!content) {
+    throw new OpenAIRequestError(502, "AI service returned an empty response.");
+  }
+  return content;
+};
+
 const parseJson = (text: string): AiResumeResult => {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON found in AI response");
-  return JSON.parse(match[0]) as AiResumeResult;
+  const parsed = JSON.parse(match[0]) as AiResumeResult;
+
+  // Ensure that experiences with different companies or roles are treated separately
+  const distinctExperiences = parsed.parsedResume?.experiences.map((exp: any, index: number) => {
+    if (index > 0 && exp.company !== parsed.parsedResume?.experiences[index - 1]?.company) {
+      // Treat this experience as a new one
+      return {
+        ...exp,
+        role: safeString(exp?.role),
+        company: safeString(exp?.company),
+        dates: safeString(exp?.dates),
+        bullets: safeArray<string>(exp?.bullets).map(bullet => safeString(bullet)),
+      };
+    }
+    return exp; // Keep merging if it's the same company and role
+  });
+
+  parsed.parsedResume.experiences = distinctExperiences;
+
+  return parsed;
 };
 
 export default async function handler(
@@ -93,8 +245,8 @@ export default async function handler(
 
   try {
     const prompt = buildPrompt(userResume, targetJob, jobDescription);
-    const result = await createChatCompletion(prompt);
-    const parsed = parseJson(result.content);
+    const content = await callGemini(prompt);
+    const parsed = parseJson(content);
     return res.status(200).json(parsed);
   } catch (error) {
     if (error instanceof OpenAIRequestError) {
@@ -102,12 +254,12 @@ export default async function handler(
         status: error.status,
         details: error.details,
       });
-      return res.status(error.status).json({ message: error.message });
+      return res.status(error.status).json({
+        message: error.details || error.message,
+      });
     }
     console.error("resumeImprove failed", error);
     const message = error instanceof Error ? error.message : "Failed to improve resume.";
     return res.status(500).json({ message });
   }
 }
-
-

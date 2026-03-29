@@ -512,7 +512,7 @@
 }
 
 .cleanWrapper {
-  border: 1px solid var(--color-e5e7eb);
+  border: 1px solid var(--color-gray);
   border-radius: 6px;
   padding: 20px;
   background: var(--color-white);
@@ -576,6 +576,10 @@
   gap: 20px;
 }
 
+.cleanWrapper ul {
+  margin-left: 15px;
+}
+
 .cleanGrid>* {
   flex: 1 1 0;
 }
@@ -595,6 +599,7 @@
   letter-spacing: 0.5px;
   color: var(--color-1f2937);
 }
+
 
 .cleanSection {
   break-inside: avoid;
@@ -619,6 +624,7 @@
 
 .slateWrapper {
   border: 1px solid var(--color-gray);
+  background-color: var(--color-white);
   border-radius: 10px;
   padding: 20px;
   font-size: 13px;
@@ -695,6 +701,15 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--color-1f2937);
+}
+
+.slateWrapper ul {
+  padding-left: 15px;
+}
+
+.slateSkillsList {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
 }
 
 .slateSection {
@@ -1183,6 +1198,43 @@
   :global(h4) {
     page-break-after: avoid;
   }
+
+}
+
+:global(body.pdf-export) .cleanGrid,
+:global(body.pdf-export) .slateTwoCol,
+:global(body.pdf-export) .resumeTwoColumn {
+  flex-direction: row;
+}
+
+:global(body.pdf-export) {
+  background: #ffffff;
+}
+
+:global(html.pdf-export) {
+  background: #ffffff;
+}
+
+:global(body.pdf-export) .printArea,
+:global(body.pdf-export) .previewCard {
+  background: #ffffff;
+}
+
+:global(body.pdf-export) .cleanWrapper,
+:global(body.pdf-export) .slateWrapper,
+:global(body.pdf-export) .navyWrapper,
+:global(body.pdf-export) .preview,
+:global(body.pdf-export) .printArea {
+  min-height: 297mm;
+}
+:global(body.pdf-export) .slateSection,
+:global(body.pdf-export) .slateItem,
+:global(body.pdf-export) .cleanSection,
+:global(body.pdf-export) .cleanItem,
+:global(body.pdf-export) .resumeSection,
+:global(body.pdf-export) .resumeList li {
+  break-inside: auto;
+  page-break-inside: auto;
 }
 
 /* Print: hide controls, keep preview colors/layout */

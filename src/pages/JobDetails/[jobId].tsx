@@ -487,8 +487,8 @@ export default function JobDetailsPage() {
                   aria-busy={aiLoading}
                 >
                   {raw.job_relevance_score !== undefined
-                    ? `Job Relevance Score: ${raw.job_relevance_score}`
-                    : "Job Relevance Score"}
+                    ? `✨ Job Relevance Score: ${raw.job_relevance_score}`
+                    : "✨ Job Relevance Score"}
                 </button>
                 {job?.companyWebsite && (
                   <a

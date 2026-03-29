@@ -279,6 +279,7 @@ const ScorecardChart = ({ labels, values, onImageReady }: ScorecardChartProps) =
   const chartRef = useRef<Chart<"bar"> | null>(null);
   const captureTimeoutRef = useRef<number | null>(null);
   const onImageReadyRef = useRef<ScorecardChartProps["onImageReady"]>(onImageReady);
+  const capturedSignatureRef = useRef<string>("");
 
   useEffect(() => {
     onImageReadyRef.current = onImageReady;
@@ -291,6 +292,9 @@ const ScorecardChart = ({ labels, values, onImageReady }: ScorecardChartProps) =
       window.clearTimeout(captureTimeoutRef.current);
       captureTimeoutRef.current = null;
     }
+
+    const signature = `${labels.join("|")}__${values.join("|")}`;
+    capturedSignatureRef.current = "";
 
     const data: ChartData<"bar"> = {
       labels,
@@ -314,12 +318,7 @@ const ScorecardChart = ({ labels, values, onImageReady }: ScorecardChartProps) =
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: "x",
-        animation: {
-          onComplete: () => {
-            if (!onImageReadyRef.current || !chartRef.current) return;
-            onImageReadyRef.current(chartRef.current.toBase64Image());
-          },
-        },
+        animation: { duration: 0 },
         scales: {
           x: {
             type: "category",
@@ -356,9 +355,11 @@ const ScorecardChart = ({ labels, values, onImageReady }: ScorecardChartProps) =
     chartRef.current = new Chart(canvasRef.current, config);
     if (onImageReadyRef.current) {
       captureTimeoutRef.current = window.setTimeout(() => {
-        if (!chartRef.current) return;
-        onImageReadyRef.current?.(chartRef.current.toBase64Image());
-      }, 500);
+        if (!chartRef.current || !onImageReadyRef.current) return;
+        if (capturedSignatureRef.current === signature) return;
+        capturedSignatureRef.current = signature;
+        onImageReadyRef.current(chartRef.current.toBase64Image());
+      }, 0);
     }
     return () => {
       if (captureTimeoutRef.current) {
@@ -381,6 +382,15 @@ type ReportSection = {
   lines: string[];
 };
 
+const normalizeScore = (raw: number) => {
+  if (!Number.isFinite(raw)) return null;
+  if (raw > 10) {
+    const scaled = Math.round(raw / 10);
+    return Math.max(0, Math.min(10, scaled));
+  }
+  return Math.max(0, Math.min(10, raw));
+};
+
 const extractScoreLines = (lines: string[]) =>
   lines
     .map((line) => line.replace(/^[-\u2022\u2013\u2014\u25B8]\s*/, ""))
@@ -395,14 +405,28 @@ const extractScoreLines = (lines: string[]) =>
       }
       const cleaned = normalized.replace(/\*\*/g, "");
       const tableMatch = cleaned.match(
-        /^\|?\s*([^|]+?)\s*\|\s*(\d{1,2})\s*\|?\s*$/
+        /^\|?\s*([^|]+?)\s*\|\s*(\d{1,3})(?:\s*\/\s*\d{1,3})?\s*\|?\s*$/
       );
       if (tableMatch) {
-        return { label: tableMatch[1].trim(), score: Number(tableMatch[2]) };
+        const score = normalizeScore(Number(tableMatch[2]));
+        if (score === null) return null;
+        return { label: tableMatch[1].trim(), score };
       }
-      const match = cleaned.match(/^(.+?)\s*:\s*(\d{1,2})\s*$/);
-      if (!match) return null;
-      return { label: match[1].trim(), score: Number(match[2]) };
+      const colonMatch = cleaned.match(
+        /^(.+?)\s*[:\-–—]\s*(\d{1,3})(?:\s*\/\s*\d{1,3})?\s*$/
+      );
+      if (colonMatch) {
+        const score = normalizeScore(Number(colonMatch[2]));
+        if (score === null) return null;
+        return { label: colonMatch[1].trim(), score };
+      }
+      const parenMatch = cleaned.match(/^(.+?)\s*\(\s*(\d{1,3})\s*\/\s*\d{1,3}\s*\)\s*$/);
+      if (parenMatch) {
+        const score = normalizeScore(Number(parenMatch[2]));
+        if (score === null) return null;
+        return { label: parenMatch[1].trim(), score };
+      }
+      return null;
     })
     .filter(Boolean) as Array<{ label: string; score: number }>;
 
