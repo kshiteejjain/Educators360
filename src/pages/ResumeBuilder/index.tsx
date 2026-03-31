@@ -537,6 +537,8 @@ export default function ResumeBuilder() {
     return missing;
   };
 
+  const missingRequiredSections = getMissingRequiredSections();
+
   const saveDownloadResume = async () => {
     if (!previewRef.current) return;
     const session = getSession();
@@ -546,9 +548,8 @@ export default function ResumeBuilder() {
     }
     if (isSaving) return;
 
-    const missingRequired = getMissingRequiredSections();
-    if (missingRequired.length > 0) {
-      const label = missingRequired.join(", ");
+    if (missingRequiredSections.length > 0) {
+      const label = missingRequiredSections.join(", ");
       toast.error(
         `Please add ${label} before saving your resume. All these sections are required.`
       );
@@ -1549,7 +1550,11 @@ export default function ResumeBuilder() {
                   </div>
                 </details>
 
-                <details className={styles.accordion}>
+                <details
+                  className={`${styles.accordion} ${
+                    missingRequiredSections.includes("skills") ? styles.accordionError : ""
+                  }`}
+                >
                   <summary className={styles.accordionHeader}>Skills</summary>
                   <div className={styles.accordionBody}>
                     <div className="form-group">
@@ -1610,7 +1615,13 @@ export default function ResumeBuilder() {
                   </div>
                 </details>
 
-                <details className={styles.accordion}>
+                <details
+                  className={`${styles.accordion} ${
+                    missingRequiredSections.includes("languages")
+                      ? styles.accordionError
+                      : ""
+                  }`}
+                >
                   <summary className={styles.accordionHeader}>Languages</summary>
                   <div className={styles.accordionBody}>
                     <div className="form-group">
@@ -1686,7 +1697,13 @@ export default function ResumeBuilder() {
                   </div>
                 </details>
 
-                <details className={styles.accordion}>
+                <details
+                  className={`${styles.accordion} ${
+                    missingRequiredSections.includes("experience")
+                      ? styles.accordionError
+                      : ""
+                  }`}
+                >
                   <summary className={styles.accordionHeader}>Experience</summary>
                   <div className={styles.accordionBody}>
                     <div className="form-group">
@@ -1748,7 +1765,13 @@ export default function ResumeBuilder() {
                   </div>
                 </details>
 
-                <details className={styles.accordion}>
+                <details
+                  className={`${styles.accordion} ${
+                    missingRequiredSections.includes("education")
+                      ? styles.accordionError
+                      : ""
+                  }`}
+                >
                   <summary className={styles.accordionHeader}>Education</summary>
                   <div className={styles.accordionBody}>
                     <div className="form-group">
@@ -1799,6 +1822,16 @@ export default function ResumeBuilder() {
                     </div>
                   </div>
                 </details>
+        {missingRequiredSections.length > 0 && (
+          <div className={`${styles.missingNotice} ${styles.noPrint}`}>
+            <span>Missing required sections before save & download:</span>
+            <ul>
+              {missingRequiredSections.map((section) => (
+                <li key={section}>{section}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className={`${styles.downloadActions} ${styles.noPrint}`}>
           <button
             type="button"

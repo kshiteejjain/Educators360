@@ -64,6 +64,26 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
+.accordionError {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 1px var(--color-error);
+}
+
+.missingNotice {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-error);
+  border-radius: 10px;
+  background: var(--color-white);
+  color: var(--color-error);
+  font-size: 13px;
+}
+
+.missingNotice ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
 .accordionHeader {
   list-style: none;
   cursor: pointer;
