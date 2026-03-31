@@ -254,7 +254,7 @@ export default function AIInterview() {
     return output;
   };
 
-  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  const arrayBufferToBase64 = (buffer: ArrayBufferLike) => {
     const bytes = new Uint8Array(buffer);
     let binary = "";
     const chunkSize = 0x8000;

@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { OpenAIRequestError } from "@/utils/openai";
-import type { ResumeTemplate } from "@/types/resume"; // Add the correct import path for ResumeTemplate
 
 type AiResumeResult = {
   score: number;
