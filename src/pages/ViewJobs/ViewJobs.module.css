@@ -1,7 +1,6 @@
 .view-jobs {
   padding: 24px;
   background: radial-gradient(circle at top left, #f6f1ea, #eef1f6 55%, #f7f3ee);
-  font-family: "Manrope", "Segoe UI", sans-serif;
 }
 
 .jobInfo {
@@ -102,7 +101,8 @@
 }
 
 .card {
-  width: 24%;
+  flex: 0 0 calc((100% - 54px) / 4);
+  max-width: calc((100% - 54px) / 4);
   border-radius: 20px;
   padding: 18px;
   background: #fff;
@@ -210,4 +210,19 @@
 
 .view-jobs ol {
   margin: 0;
+}
+
+
+@media (max-width: 1200px) {
+  .card {
+    flex: 0 0 calc((100% - 36px) / 3);
+    max-width: calc((100% - 36px) / 3);
+  }
+}
+
+@media (max-width: 1024px) {
+  .card {
+    flex: 0 0 calc((100% - 18px) / 2);
+    max-width: calc((100% - 18px) / 2);
+  }
 }

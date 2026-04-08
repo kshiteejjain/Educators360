@@ -541,7 +541,7 @@
   width: 100%;
   box-sizing: border-box;
   padding-bottom: 16px;
-  font-family: "Ubuntu", sans-serif;
+  
 }
 
 .cleanHeader {
@@ -652,7 +652,7 @@
   width: 100%;
   box-sizing: border-box;
   padding-bottom: 16px;
-  font-family: "Ubuntu", sans-serif;
+  
 }
 
 .slateHeader {
@@ -938,7 +938,6 @@
   letter-spacing: 0.5px;
   color: var(--color-1f2937);
   font-weight: 700;
-  font-family: inherit;
 }
 
 .resumeList {
@@ -988,7 +987,7 @@
   box-sizing: border-box;
   padding-bottom: 0;
   min-height: var(--navy-page-height);
-  font-family: "Ubuntu", sans-serif;
+  
 }
 
 .navyWrapper> :first-child {
@@ -1171,7 +1170,6 @@
   width: min(900px, 100%);
   margin: 0 auto;
   box-sizing: border-box;
-  font-family: "Ubuntu", sans-serif;
 }
 
 .printArea ul li {

@@ -497,6 +497,5 @@
 .resultBody {
   margin: 0;
   white-space: pre-wrap;
-  font-family: "Courier New", Courier, monospace;
   color: var(--color-text);
 }

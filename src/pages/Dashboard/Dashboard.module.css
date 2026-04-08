@@ -784,8 +784,6 @@
   margin: 0;
   display: grid;
   gap: 8px;
-  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
   font-size: 0.85rem;
 }
 

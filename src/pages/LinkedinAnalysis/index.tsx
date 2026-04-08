@@ -380,6 +380,19 @@ export default function LinkedinAnalysis() {
   const { withLoader } = useLoader();
   const resultsAnchorId = "linkedin-analysis-results";
   const craftAnchorId = "linkedin-craft-result";
+  const normalizeLinkedinUrl = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+    if (/^linkedin\.com/i.test(trimmed)) return `https://${trimmed}`;
+    return trimmed;
+  };
+
+  const isValidLinkedinUrl = (value: string) => {
+    const normalized = normalizeLinkedinUrl(value);
+    return /^https?:\/\/(www\.)?linkedin\.com\/.+/i.test(normalized);
+  };
 
   const getAiModifications = () => {
     const modifications = analysisResult?.aiAnalysis?.modifications;
@@ -476,8 +489,13 @@ export default function LinkedinAnalysis() {
     }
 
     const nextErrors: { linkedinUrl?: string; targetRole?: string } = {};
-    if (!isNoLinkedin && !linkedinUrl.trim()) {
+    const normalizedLinkedinUrl = normalizeLinkedinUrl(linkedinUrl);
+    if (!isNoLinkedin && !normalizedLinkedinUrl) {
       nextErrors.linkedinUrl = "Please enter a valid LinkedIn profile URL";
+    }
+    if (!isNoLinkedin && normalizedLinkedinUrl && !isValidLinkedinUrl(normalizedLinkedinUrl)) {
+      nextErrors.linkedinUrl =
+        "Please enter a valid LinkedIn profile URL (e.g., https://www.linkedin.com/in/username/)";
     }
     if (!targetRole.trim()) {
       nextErrors.targetRole = "Please enter a target role";
@@ -497,7 +515,7 @@ export default function LinkedinAnalysis() {
           body: JSON.stringify(
             isNoLinkedin
               ? { profileText: resumeCvText, targetRole }
-              : { profileUrl: linkedinUrl, targetRole }
+              : { profileUrl: normalizedLinkedinUrl, targetRole }
           ),
         });
         const baseData = (await response.json()) as
@@ -693,7 +711,7 @@ export default function LinkedinAnalysis() {
                 <label htmlFor="linkedinUrl">Enter Your LinkedIn Profile URL *</label>
                 <input
                   id="linkedinUrl"
-                  type="url"
+                  type="text"
                   value={linkedinUrl}
                   onChange={(e) => {
                     setLinkedinUrl(e.target.value);
