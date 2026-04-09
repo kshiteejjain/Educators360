@@ -1133,11 +1133,11 @@
 }
 
 .bold {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .personalMeta {
-  color: #2563eb;
+  color: var(--color-primary);
   font-weight: 600;
 }
 

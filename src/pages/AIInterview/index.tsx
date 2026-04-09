@@ -1,42 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import Layout from "@/components/Layout/Layout";
+import Loader from "@/components/Loader/Loader";
 import styles from "./AIInterview.module.css";
 
 type ViewMode = "configure" | "interact";
-
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  ts: number;
-};
 
 type OpenAIMessage = {
   role: "user" | "assistant" | "system";
   content: string;
 };
 
-type SilenceStage = 0 | 1 | 2;
-
-type SpeakOptions = {
-  nextSilenceMs?: number;
-  onDone?: () => void;
-  skipRestartRecognition?: boolean;
-};
-
-type McqOption = {
-  label: "A" | "B" | "C" | "D";
-  text: string;
-};
-
-type McqItem = {
+type InterviewQuestion = {
   id: string;
-  question: string;
-  options: McqOption[];
-  answer?: "A" | "B" | "C" | "D";
-  raw: string;
-  questionNumber?: number;
+  prompt: string;
+  category: string;
 };
 
 type InterviewReport = {
@@ -50,61 +28,90 @@ type InterviewReport = {
   strengths: string[];
   gaps: string[];
   recommendations: string[];
+  suggestions?: string[];
+  feedback?: string[];
+  overallFeedback?: string;
 };
 
-const SPEECH_SILENCE_MS = 8000;
-const FOLLOW_UP_SILENCE_MS = 5000;
+const SUBJECTIVE_QUESTIONS: InterviewQuestion[] = [
+  {
+    id: "q-1",
+    prompt: "Tell me about yourself and what motivated you to pursue this role.",
+    category: "Introduction",
+  },
+  {
+    id: "q-2",
+    prompt: "Describe a time you solved a difficult problem. What was your approach?",
+    category: "Problem Solving",
+  },
+  {
+    id: "q-3",
+    prompt: "How do you prioritize tasks when you have multiple deadlines?",
+    category: "Time Management",
+  },
+  {
+    id: "q-4",
+    prompt: "Share a situation where you received constructive feedback. How did you respond?",
+    category: "Feedback",
+  },
+  {
+    id: "q-5",
+    prompt: "Walk me through a project you are proud of and your specific contributions.",
+    category: "Experience",
+  },
+  {
+    id: "q-6",
+    prompt: "How would you explain a complex concept to someone non-technical?",
+    category: "Communication",
+  },
+  {
+    id: "q-7",
+    prompt: "Tell me about a time you had to collaborate across teams to get results.",
+    category: "Collaboration",
+  },
+  {
+    id: "q-8",
+    prompt: "What do you consider your top strengths for this role, and why?",
+    category: "Strengths",
+  },
+  {
+    id: "q-9",
+    prompt: "What areas are you currently improving, and how are you doing it?",
+    category: "Growth Mindset",
+  },
+  {
+    id: "q-10",
+    prompt: "Why should we hire you? Summarize your value in one minute.",
+    category: "Closing",
+  },
+];
 
 export default function AIInterview() {
   const [view, setView] = useState<ViewMode>("configure");
   const [contextPrompt, setContextPrompt] = useState("");
-  const [isActive, setIsActive] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [status, setStatus] = useState<"idle" | "connecting" | "live" | "error">(
-    "idle"
-  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  const [isUserSpeaking, setIsUserSpeaking] = useState(false);
-  const [silenceCountdown, setSilenceCountdown] = useState<number | null>(null);
   const [activeCard, setActiveCard] = useState<"chat" | "audio" | null>(null);
-  const [mcqItems, setMcqItems] = useState<McqItem[]>([]);
-  const [mcqLoading, setMcqLoading] = useState(false);
+  const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechError, setSpeechError] = useState<string>("");
   const [interviewStartedAt, setInterviewStartedAt] = useState<number | null>(null);
   const [interviewCompletedAt, setInterviewCompletedAt] = useState<number | null>(null);
   const [interviewReport, setInterviewReport] = useState<InterviewReport | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [questionLoading, setQuestionLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scoreChartRef = useRef<Chart<"doughnut", number[], string> | null>(null);
   const completionChartRef = useRef<Chart<"bar", number[], string> | null>(null);
   const scoreCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const completionCanvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const recognitionActiveRef = useRef(false);
-  const isActiveRef = useRef(false);
-  const isAiSpeakingRef = useRef(false);
-  const isMutedRef = useRef(false);
-
-  const silenceStageRef = useRef<SilenceStage>(0);
-  const silenceDeadlineRef = useRef<number | null>(null);
-  const silenceIntervalRef = useRef<number | null>(null);
-  const userTurnActiveRef = useRef(false);
+  const recognitionRef = useRef<any>(null);
+  const recordingQuestionIdRef = useRef<string | null>(null);
+  const pendingRecordingStartRef = useRef<string | null>(null);
+  const silenceTimeoutRef = useRef<number | null>(null);
 
   const conversationRef = useRef<OpenAIMessage[]>([]);
-
-  useEffect(() => {
-    isActiveRef.current = isActive;
-  }, [isActive]);
-
-  useEffect(() => {
-    isAiSpeakingRef.current = isAiSpeaking;
-  }, [isAiSpeaking]);
-
-  useEffect(() => {
-    isMutedRef.current = isMuted;
-  }, [isMuted]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -121,17 +128,110 @@ export default function AIInterview() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+      return;
+    }
+
+    setSpeechSupported(true);
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+
+    const resetSilenceTimer = () => {
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+      }
+      silenceTimeoutRef.current = window.setTimeout(() => {
+        if (!recordingQuestionIdRef.current) return;
+        recognition.stop();
+      }, 5000);
+    };
+
+    recognition.onresult = (event: any) => {
+      resetSilenceTimer();
+      const questionId = recordingQuestionIdRef.current;
+      if (!questionId) return;
+
+      let finalTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0]?.transcript || "";
+        }
+      }
+
+      if (!finalTranscript) return;
+
+      setAnswers((prev) => {
+        const prevValue = prev[questionId] || "";
+        const separator = prevValue && !prevValue.endsWith(" ") ? " " : "";
+        return {
+          ...prev,
+          [questionId]: prevValue + separator + finalTranscript.trim(),
+        };
+      });
+    };
+
+    recognition.onerror = (event: any) => {
+      setSpeechError(
+        event?.error
+          ? `Speech recognition error: ${event.error}`
+          : "Speech recognition failed."
+      );
+      setRecordingQuestionId(null);
+      recordingQuestionIdRef.current = null;
+    };
+
+    recognition.onend = () => {
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
+      }
+
+      const nextId = pendingRecordingStartRef.current;
+      pendingRecordingStartRef.current = null;
+      if (nextId) {
+        recordingQuestionIdRef.current = nextId;
+        setRecordingQuestionId(nextId);
+        try {
+          recognition.start();
+          resetSilenceTimer();
+        } catch (err) {
+          setSpeechError("Unable to start speech recording.");
+        }
+        return;
+      }
+      setRecordingQuestionId(null);
+      recordingQuestionIdRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+
     return () => {
-      stopRecognition();
-      stopSilenceWatch();
-      window.speechSynthesis?.cancel();
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
+      }
+      try {
+        recognition.stop();
+      } catch {
+        // ignore
+      }
     };
   }, []);
 
   useEffect(() => {
     if (!interviewReport) return;
 
-    const totalQuestions = interviewReport.totalQuestions || 20;
+    const totalQuestions =
+      interviewReport.totalQuestions || questions.length || 10;
     const answered = interviewReport.answeredQuestions || 0;
     const score = Math.max(0, Math.min(10, interviewReport.score || 0));
     const scoreData: number[] = [score, Math.max(0, 10 - score)];
@@ -209,316 +309,90 @@ export default function AIInterview() {
       scoreChartRef.current = null;
       completionChartRef.current = null;
     };
-  }, [interviewReport]);
+  }, [interviewReport, questions.length]);
 
-  const addMessage = (role: "user" | "assistant", text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-
-    setMessages((prev) => {
-      const next = [
-        ...prev,
-        {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          role,
-          text: trimmed,
-          ts: Date.now(),
-        },
-      ];
-      return next.length > 300 ? next.slice(-300) : next;
-    });
-  };
-
-  const resetSilenceFlow = () => {
-    silenceStageRef.current = 0;
-    silenceDeadlineRef.current = null;
-    setSilenceCountdown(null);
-  };
-
-  const startSilenceWatch = () => {
-    if (silenceIntervalRef.current) return;
-    silenceIntervalRef.current = window.setInterval(handleSilenceTick, 1000);
-  };
-
-  const stopSilenceWatch = () => {
-    if (!silenceIntervalRef.current) return;
-    window.clearInterval(silenceIntervalRef.current);
-    silenceIntervalRef.current = null;
-  };
-
-  const handleSilenceTick = () => {
-    if (!isActiveRef.current) return;
-    if (isAiSpeakingRef.current) return;
-    if (!userTurnActiveRef.current) return;
-    if (!silenceDeadlineRef.current) return;
-
-    const remainingMs = silenceDeadlineRef.current - Date.now();
-    if (remainingMs > 0) {
-      setSilenceCountdown(Math.ceil(remainingMs / 1000));
-      return;
-    }
-
-    if (silenceStageRef.current === 0) {
-      userTurnActiveRef.current = false;
-      speak("Are you there?", { nextSilenceMs: FOLLOW_UP_SILENCE_MS });
-      silenceStageRef.current = 1;
-      silenceDeadlineRef.current = Date.now() + FOLLOW_UP_SILENCE_MS;
-      setSilenceCountdown(Math.ceil(FOLLOW_UP_SILENCE_MS / 1000));
-      return;
-    }
-
-    if (silenceStageRef.current === 1) {
-      userTurnActiveRef.current = false;
-      speak("Are you there?", { nextSilenceMs: FOLLOW_UP_SILENCE_MS });
-      silenceStageRef.current = 2;
-      silenceDeadlineRef.current = Date.now() + FOLLOW_UP_SILENCE_MS;
-      setSilenceCountdown(Math.ceil(FOLLOW_UP_SILENCE_MS / 1000));
-      return;
-    }
-
-    userTurnActiveRef.current = false;
-    silenceDeadlineRef.current = null;
-    setSilenceCountdown(null);
-    speak("Thank you for your time. Have a good day.", {
-      skipRestartRecognition: true,
-      onDone: () => endInterview("inactive"),
-    });
-  };
-
-  const getRecognitionConstructor = () => {
-    if (typeof window === "undefined") return null;
-    return (
-      (window as Window & {
-        webkitSpeechRecognition?: typeof SpeechRecognition;
-      }).SpeechRecognition ||
-      (window as Window & {
-        webkitSpeechRecognition?: typeof SpeechRecognition;
-      }).webkitSpeechRecognition ||
-      null
-    );
-  };
-
-  const stopRecognition = () => {
-    if (!recognitionRef.current) return;
-    recognitionActiveRef.current = false;
-    recognitionRef.current.onresult = null;
-    recognitionRef.current.onerror = null;
-    recognitionRef.current.onend = null;
-    recognitionRef.current.onspeechstart = null;
-    recognitionRef.current.onspeechend = null;
-    recognitionRef.current.stop();
-  };
-
-  const startRecognition = () => {
-    if (isMutedRef.current || isAiSpeakingRef.current || !isActiveRef.current) {
-      return;
-    }
-    if (!recognitionRef.current) return;
-    if (recognitionActiveRef.current) return;
-    try {
-      recognitionRef.current.start();
-      recognitionActiveRef.current = true;
-    } catch {
-      // Some browsers throw if already started.
-    }
-  };
-
-  const setupRecognition = () => {
-    const RecognitionCtor = getRecognitionConstructor();
-    if (!RecognitionCtor) {
-      setStatus("error");
-      setErrorMessage("This browser does not support Speech Recognition.");
-      return false;
-    }
-
-    const recognition = new RecognitionCtor();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognition.maxAlternatives = 1;
-
-    recognition.onspeechstart = () => {
-      setIsUserSpeaking(true);
-      resetSilenceFlow();
-    };
-
-    recognition.onspeechend = () => {
-      setIsUserSpeaking(false);
-    };
-
-    recognition.onresult = (event) => {
-      const results = Array.from(event.results || []);
-      const startIndex = Math.max(0, event.resultIndex || 0);
-      const finalTranscripts = results
-        .slice(startIndex)
-        .filter((result) => result.isFinal)
-        .map((result) => result[0]?.transcript?.trim())
-        .filter(Boolean) as string[];
-
-      if (!finalTranscripts.length) return;
-
-      const transcript = finalTranscripts.join(" ").trim();
-      if (!transcript) return;
-
-      addMessage("user", transcript);
-      conversationRef.current = [
-        ...conversationRef.current,
-        { role: "user", content: transcript },
-      ];
-
-      userTurnActiveRef.current = false;
-      resetSilenceFlow();
-      stopRecognition();
-      void requestAiResponse();
-    };
-
-    recognition.onerror = (event) => {
-      recognitionActiveRef.current = false;
-      const errorType = (event as SpeechRecognitionErrorEvent)?.error;
-      if (errorType === "not-allowed" || errorType === "service-not-allowed") {
-        setStatus("error");
-        setErrorMessage("Microphone access is blocked. Please allow mic access.");
-        return;
-      }
-      if (isActiveRef.current && !isAiSpeakingRef.current && !isMutedRef.current) {
-        window.setTimeout(startRecognition, 500);
-      }
-    };
-
-    recognition.onstart = () => {
-      recognitionActiveRef.current = true;
-    };
-
-    recognition.onend = () => {
-      recognitionActiveRef.current = false;
-      if (isActiveRef.current && !isAiSpeakingRef.current && !isMutedRef.current) {
-        window.setTimeout(startRecognition, 250);
-      }
-    };
-
-    recognitionRef.current = recognition;
-    return true;
-  };
-
-  const parseMcqReply = (reply: string) => {
-    const lines = reply
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    const optionPattern = /^[A-D][\).\-\:]\s+/i;
-    const firstOptionIndex = lines.findIndex((line) => optionPattern.test(line));
-    const questionLines =
-      firstOptionIndex === -1 ? lines : lines.slice(0, firstOptionIndex);
-    const optionsLines =
-      firstOptionIndex === -1 ? [] : lines.slice(firstOptionIndex);
-    const question = questionLines.join(" ").trim() || reply.trim();
-    const options: McqOption[] = optionsLines
-      .map((line) => {
-        const match = line.match(/^([A-D])[\).\-\:]\s+(.*)$/i);
-        if (!match) return null;
-        const label = match[1].toUpperCase() as McqOption["label"];
-        const text = match[2].trim();
-        return text ? { label, text } : null;
-      })
-      .filter(Boolean) as McqOption[];
-    const questionNumberMatch = reply.match(/(\d+)\s*\/\s*20/);
-    const questionNumber = questionNumberMatch
-      ? Number(questionNumberMatch[1])
-      : undefined;
-
-    return { question, options, questionNumber };
-  };
-
-  const requestMcqQuestion = async (start = false) => {
-    setMcqLoading(true);
+  const startChatInterview = async () => {
     setErrorMessage(null);
+    setInterviewReport(null);
+    setInterviewStartedAt(Date.now());
+    setInterviewCompletedAt(null);
+    setSpeechError("");
+    setRecordingQuestionId(null);
+    setQuestions([]);
+    setAnswers({});
+    setCurrentIndex(0);
+    setQuestionLoading(false);
 
+    const trimmedContext = contextPrompt.trim();
+    if (!trimmedContext) {
+      setQuestions(SUBJECTIVE_QUESTIONS);
+      return;
+    }
+
+    setQuestionLoading(true);
     try {
-      syncConversationFromMcq();
       const response = await fetch("/api/aiInterviewChat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contextPrompt,
-          messages: conversationRef.current,
-          start,
+          mode: "questions",
+          contextPrompt: trimmedContext,
+          questionCount: SUBJECTIVE_QUESTIONS.length,
         }),
       });
 
       if (!response.ok) {
         const payload = (await response.json()) as { message?: string };
-        throw new Error(payload?.message || "Failed to reach AI service.");
+        throw new Error(payload?.message || "Failed to generate questions.");
       }
 
-      const data = (await response.json()) as { reply: string };
-      if (!data.reply) {
-        throw new Error("AI response was empty.");
+      const data = (await response.json()) as { questions?: InterviewQuestion[] };
+      if (!data.questions?.length) {
+        throw new Error("Question list was empty.");
       }
 
-      conversationRef.current = [
-        ...conversationRef.current,
-        { role: "assistant", content: data.reply },
-      ];
-
-      const parsed = parseMcqReply(data.reply);
-      const mcqItem: McqItem = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        question: parsed.question,
-        options: parsed.options,
-        raw: data.reply,
-        questionNumber: parsed.questionNumber,
-      };
-      setMcqItems((prev) => [...prev, mcqItem]);
-      setCurrentIndex((prev) =>
-        prev === mcqItems.length - 1 ? prev + 1 : prev
-      );
+      setQuestions(data.questions);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "AI request failed.";
+      const message =
+        error instanceof Error ? error.message : "Unable to generate questions.";
       setErrorMessage(message);
+      setQuestions(SUBJECTIVE_QUESTIONS);
     } finally {
-      setMcqLoading(false);
+      setQuestionLoading(false);
     }
   };
 
-  const startMcqInterview = () => {
-    setIsActive(true);
-    setInterviewReport(null);
-    setInterviewStartedAt(Date.now());
-    setInterviewCompletedAt(null);
-    conversationRef.current = [];
-    setMcqItems([]);
-    setCurrentIndex(0);
-    void requestMcqQuestion(true);
+  const updateAnswerText = (questionId: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
-  const updateAnswer = (index: number, answer: McqItem["answer"]) => {
-    setMcqItems((prev) =>
-      prev.map((item, idx) => (idx === index ? { ...item, answer } : item))
-    );
-  };
+  const buildConversationFromAnswers = () => {
+    const reportInstruction = `You are an interview evaluator. Using the candidate's answers, return a structured report with: score (0-10), confidence level, time taken, answered/total count, completion status, summary, strengths, gaps, recommendations, suggestions, and feedback. Keep feedback specific to each answer and actionable. Return JSON only in the InterviewReport shape.`;
 
-  const syncConversationFromMcq = () => {
-    conversationRef.current = mcqItems.flatMap((item) => {
-      const entries: OpenAIMessage[] = [
-        { role: "assistant", content: item.raw || item.question },
+    const answerMessages = questions.flatMap<OpenAIMessage>((question) => {
+      const response = answers[question.id]?.trim();
+      if (!response) return [];
+      return [
+        { role: "assistant", content: `Question (${question.category}): ${question.prompt}` },
+        { role: "user", content: response },
       ];
-      if (item.answer) {
-        entries.push({ role: "user", content: item.answer });
-      }
-      return entries;
     });
+
+    conversationRef.current = [
+      { role: "system", content: reportInstruction },
+      ...answerMessages,
+    ];
   };
 
   const goToNext = () => {
-    const currentItem = mcqItems[currentIndex];
-    if (!currentItem || !currentItem.answer || mcqLoading) return;
+    const currentQuestion = questions[currentIndex];
+    if (!currentQuestion) return;
+    if (!answers[currentQuestion.id]?.trim()) return;
 
-    if (currentIndex < mcqItems.length - 1) {
-      setCurrentIndex((prev) => Math.min(prev + 1, mcqItems.length - 1));
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex((prev) => Math.min(prev + 1, questions.length - 1));
       return;
     }
-
-    void requestMcqQuestion(false);
   };
 
   const goToPrevious = () => {
@@ -526,15 +400,18 @@ export default function AIInterview() {
   };
 
   const submitInterview = () => {
-    if (!mcqItems.some((item) => item.answer)) return;
-    syncConversationFromMcq();
-    setInterviewCompletedAt(Date.now());
-    setIsActive(false);
+    const hasAnyAnswer = Object.values(answers).some((answer) => answer.trim());
+    if (!hasAnyAnswer) return;
+    const completedAt = Date.now();
+    buildConversationFromAnswers();
+    setInterviewCompletedAt(completedAt);
+    void fetchInterviewReport(completedAt);
   };
 
-  const fetchInterviewReport = async () => {
+  const fetchInterviewReport = async (completedAtOverride?: number) => {
     if (!interviewStartedAt) return;
-    if (!mcqItems.some((item) => item.answer)) {
+    const hasAnyAnswer = Object.values(answers).some((answer) => answer.trim());
+    if (!hasAnyAnswer) {
       setErrorMessage("Please answer at least one question to complete the interview.");
       return;
     }
@@ -543,7 +420,7 @@ export default function AIInterview() {
     setErrorMessage(null);
 
     try {
-      syncConversationFromMcq();
+      buildConversationFromAnswers();
       const response = await fetch("/api/aiInterviewChat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -552,7 +429,13 @@ export default function AIInterview() {
           contextPrompt,
           messages: conversationRef.current,
           startedAt: interviewStartedAt,
-          completedAt: interviewCompletedAt ?? Date.now(),
+          completedAt: completedAtOverride ?? interviewCompletedAt ?? Date.now(),
+          questions: questions.map((question) => ({
+            id: question.id,
+            category: question.category,
+            prompt: question.prompt,
+            answer: answers[question.id]?.trim() || "",
+          })),
         }),
       });
 
@@ -575,156 +458,74 @@ export default function AIInterview() {
     }
   };
 
-  const requestAiResponse = async (start = false) => {
-    setStatus("connecting");
-
-    try {
-      const response = await fetch("/api/aiInterviewChat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contextPrompt,
-          messages: conversationRef.current,
-          start,
-        }),
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json()) as { message?: string };
-        throw new Error(payload?.message || "Failed to reach AI service.");
-      }
-
-      const data = (await response.json()) as { reply: string };
-      if (!data.reply) {
-        throw new Error("AI response was empty.");
-      }
-
-      conversationRef.current = [
-        ...conversationRef.current,
-        { role: "assistant", content: data.reply },
-      ];
-      addMessage("assistant", data.reply);
-
-      speak(data.reply, { nextSilenceMs: SPEECH_SILENCE_MS });
-      setStatus("live");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "AI request failed.";
-      setStatus("error");
-      setErrorMessage(message);
-    }
-  };
-
-  const speak = (text: string, options: SpeakOptions = {}) => {
-    if (typeof window === "undefined") return;
-
-    stopRecognition();
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    setIsAiSpeaking(true);
-    userTurnActiveRef.current = false;
-    resetSilenceFlow();
-
-    utterance.onend = () => {
-      setIsAiSpeaking(false);
-      options.onDone?.();
-
-      if (options.skipRestartRecognition) return;
-
-      if (options.nextSilenceMs != null) {
-        userTurnActiveRef.current = true;
-        silenceStageRef.current = 0;
-        silenceDeadlineRef.current = Date.now() + options.nextSilenceMs;
-        setSilenceCountdown(Math.ceil(options.nextSilenceMs / 1000));
-      }
-
-      startRecognition();
-    };
-
-    utterance.onerror = () => {
-      setIsAiSpeaking(false);
-      if (!options.skipRestartRecognition) {
-        startRecognition();
-      }
-    };
-
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const startInterview = () => {
-    setErrorMessage(null);
-    setStatus("live");
-    setIsActive(true);
-
-    conversationRef.current = [];
-    setMessages([]);
-    resetSilenceFlow();
-    startSilenceWatch();
-
-    if (!setupRecognition()) return;
-    userTurnActiveRef.current = true;
-    startRecognition();
-    void requestAiResponse(true);
-  };
-
-  const endInterview = (reason: "user" | "inactive") => {
-    setIsActive(false);
-    setStatus("idle");
-    stopRecognition();
-    stopSilenceWatch();
-    resetSilenceFlow();
-    setIsUserSpeaking(false);
-    setIsAiSpeaking(false);
-
-    if (reason === "inactive") {
-      setErrorMessage("Interview ended due to inactivity.");
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setView("interact");
     if (activeCard === "chat") {
-      startMcqInterview();
+      await startChatInterview();
     }
   };
 
   const handleBack = () => {
     setView("configure");
-    endInterview("user");
-    setMcqItems([]);
+    setQuestions([]);
+    setAnswers({});
     setCurrentIndex(0);
     setInterviewReport(null);
     setInterviewStartedAt(null);
     setInterviewCompletedAt(null);
     setReportLoading(false);
+    setRecordingQuestionId(null);
+    recordingQuestionIdRef.current = null;
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // ignore
+    }
   };
 
-  const toggleMute = () => {
-    setIsMuted((prev) => {
-      const next = !prev;
-      if (next) {
-        stopRecognition();
-        setIsUserSpeaking(false);
-      } else {
-        if (isAiSpeakingRef.current) {
-          window.speechSynthesis?.cancel();
+  const toggleRecordingForQuestion = (questionId: string) => {
+    if (!recognitionRef.current) return;
+
+    setSpeechError("");
+
+    if (recordingQuestionIdRef.current) {
+      pendingRecordingStartRef.current = questionId;
+      recognitionRef.current.stop();
+      return;
+    }
+
+    recordingQuestionIdRef.current = questionId;
+    setRecordingQuestionId(questionId);
+    try {
+      recognitionRef.current.start();
+      if (typeof window !== "undefined") {
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
         }
-        startRecognition();
+        silenceTimeoutRef.current = window.setTimeout(() => {
+          recognitionRef.current?.stop();
+        }, 5000);
       }
-      return next;
-    });
+    } catch (err) {
+      setSpeechError("Unable to start speech recording.");
+    }
   };
 
-  const agentSubtitle = useMemo(() => {
-    if (status === "connecting") return "Connecting...";
-    if (status === "error") return "Error";
-    return isActive ? "Interview in progress" : "Ready to start";
-  }, [status, isActive]);
+  const currentQuestion = questions[currentIndex];
+  const isRecording = recordingQuestionId === currentQuestion?.id;
 
   return (
     <Layout>
       <section className={styles.page}>
+        <Loader
+          active={questionLoading}
+          message="Generating tailored questions from your context..."
+        />
         {view === "configure" ? (
           <>
             <div className={styles.headerRow}>
@@ -885,7 +686,12 @@ export default function AIInterview() {
                       <div className={styles.reportCharts}>
                         <div className={styles.chartCard}>
                           <div className={styles.chartTitle}>Score (out of 10)</div>
-                          <canvas ref={scoreCanvasRef} height={140} />
+                          <canvas
+                            ref={scoreCanvasRef}
+                            className={styles.scoreChartCanvas}
+                            width={180}
+                            height={180}
+                          />
                         </div>
                         <div className={styles.chartCard}>
                           <div className={styles.chartTitle}>Completion</div>
@@ -897,6 +703,15 @@ export default function AIInterview() {
                         <div className={styles.sectionTitle}>📝 Summary</div>
                         <p className={styles.sectionBody}>{interviewReport.summary}</p>
                       </div>
+
+                      {interviewReport.overallFeedback ? (
+                        <div className={styles.reportSection}>
+                          <div className={styles.sectionTitle}>🧠 Overall Feedback</div>
+                          <p className={styles.sectionBody}>
+                            {interviewReport.overallFeedback}
+                          </p>
+                        </div>
+                      ) : null}
 
                       <div className={styles.reportColumns}>
                         <div className={styles.reportSection}>
@@ -923,6 +738,26 @@ export default function AIInterview() {
                             ))}
                           </ul>
                         </div>
+                        {interviewReport.suggestions?.length ? (
+                          <div className={styles.reportSection}>
+                            <div className={styles.sectionTitle}>💡 Suggestions</div>
+                            <ul className={styles.sectionList}>
+                              {interviewReport.suggestions.map((item, idx) => (
+                                <li key={`suggestion-${idx}`}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {interviewReport.feedback?.length ? (
+                          <div className={styles.reportSection}>
+                            <div className={styles.sectionTitle}>🧾 Feedback</div>
+                            <ul className={styles.sectionList}>
+                              {interviewReport.feedback.map((item, idx) => (
+                                <li key={`feedback-${idx}`}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ) : (
@@ -930,47 +765,64 @@ export default function AIInterview() {
                       <div className={styles.questionHeader}>
                         <div>
                           <h3>Interview Questions</h3>
-                          <p>Answer one question at a time</p>
+                          <p>Answer one question at a time using text or voice</p>
                         </div>
                         <div className={styles.questionMeta}>
-                          {mcqItems.length ? `${currentIndex + 1}/${mcqItems.length}` : "0/20"}
+                          {questionLoading
+                            ? "Generating..."
+                            : questions.length
+                              ? `${currentIndex + 1}/${questions.length}`
+                          : `0/${SUBJECTIVE_QUESTIONS.length}`}
                         </div>
                       </div>
 
-                      {mcqItems.length ? (
+                      {speechError ? (
+                        <div className={styles.speechError}>{speechError}</div>
+                      ) : null}
+
+                      {questions.length ? (
                         <div className={styles.questionCard}>
                           <div className={styles.questionTitle}>
-                            {mcqItems[currentIndex]?.questionNumber
-                              ? `Question ${mcqItems[currentIndex].questionNumber}/20`
+                            {currentQuestion
+                              ? `Question ${currentIndex + 1}/${questions.length}`
                               : "Question"}
                           </div>
                           <div className={styles.questionText}>
-                            {mcqItems[currentIndex]?.question}
+                            {currentQuestion?.prompt}
                           </div>
-                          <div className={styles.optionsList}>
-                            {mcqItems[currentIndex]?.options.map((option) => (
-                              <label
-                                key={`${mcqItems[currentIndex].id}-${option.label}`}
-                                className={styles.optionItem}
-                              >
-                                <input
-                                  type="radio"
-                                  name={`mcq-${mcqItems[currentIndex].id}`}
-                                  value={option.label}
-                                  checked={mcqItems[currentIndex]?.answer === option.label}
-                                  onChange={() =>
-                                    updateAnswer(currentIndex, option.label)
-                                  }
-                                  disabled={mcqLoading || Boolean(interviewCompletedAt)}
-                                />
-                                <span className={styles.optionLabel}>
-                                  {option.label}. {option.text}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                          <div className={styles.questionHint}>
-                            {mcqLoading ? "Loading next question..." : "Select an answer to continue"}
+                          <div className={styles.answerBlock}>
+                            <div className={styles.answerInputWrapper}>
+                              <textarea
+                                className={`${styles.answerTextarea} ${
+                                  isRecording ? styles.answerTextareaRecording : ""
+                                }`}
+                                value={answers[currentQuestion?.id] ?? ""}
+                                onChange={(e) =>
+                                  updateAnswerText(currentQuestion.id, e.target.value)
+                                }
+                                placeholder="Type your answer here..."
+                                rows={6}
+                                disabled={Boolean(interviewCompletedAt)}
+                              />
+                              {speechSupported && (
+                                <button
+                                  type="button"
+                                  className={`${styles.recordButton} ${
+                                    isRecording ? styles.recordButtonActive : ""
+                                  }`}
+                                  onClick={() => toggleRecordingForQuestion(currentQuestion.id)}
+                                  aria-label="Start recording"
+                                  disabled={Boolean(interviewCompletedAt) || isRecording}
+                                >
+                                  <img src="/mic.svg" alt="Mic" width={18} height={18} />
+                                </button>
+                              )}
+                            </div>
+                            {isRecording && (
+                              <div className={styles.speechHint}>
+                                Recording... will stop after 5 seconds of silence.
+                              </div>
+                            )}
                           </div>
                         </div>
                       ) : (
@@ -986,7 +838,7 @@ export default function AIInterview() {
                         </div>
                       ) : null}
 
-                      {mcqItems.length ? (
+                      {questions.length ? (
                         <div className={styles.questionActions}>
                           {!interviewCompletedAt ? (
                             <>
@@ -1003,12 +855,8 @@ export default function AIInterview() {
                                 className="btn-primary"
                                 onClick={goToNext}
                                 disabled={
-                                  !mcqItems[currentIndex]?.answer ||
-                                  mcqLoading ||
-                                  Boolean(
-                                    mcqItems[currentIndex]?.questionNumber &&
-                                      mcqItems[currentIndex]?.questionNumber >= 20
-                                  )
+                                  !questions[currentIndex] ||
+                                  !answers[questions[currentIndex].id]?.trim()
                                 }
                               >
                                 Next Question
@@ -1019,17 +867,12 @@ export default function AIInterview() {
                             type="button"
                             className="btn-primary"
                             onClick={submitInterview}
-                            disabled={!mcqItems.some((item) => item.answer)}
+                            disabled={
+                              reportLoading ||
+                              !Object.values(answers).some((answer) => answer.trim())
+                            }
                           >
-                            Submit Interview
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            onClick={fetchInterviewReport}
-                            disabled={!interviewCompletedAt || reportLoading}
-                          >
-                            {reportLoading ? "Generating Report..." : "Get Report"}
+                            {reportLoading ? "Generating Report..." : "Submit Interview"}
                           </button>
                         </div>
                       ) : null}

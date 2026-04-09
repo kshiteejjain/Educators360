@@ -6,17 +6,25 @@ type OpenAIMessage = {
   content: string;
 };
 
+type InterviewQuestion = {
+  id: string;
+  prompt: string;
+  category: string;
+};
+
 type ChatRequest = {
   contextPrompt?: string;
   messages?: OpenAIMessage[];
   start?: boolean;
-  mode?: "chat" | "report";
+  mode?: "chat" | "report" | "questions";
+  questionCount?: number;
   startedAt?: number;
   completedAt?: number;
 };
 
 type ChatResponse = {
   reply?: string;
+  questions?: InterviewQuestion[];
   report?:
     | {
         score: number;
@@ -67,6 +75,25 @@ const buildSystemMessage = (contextPrompt?: string) => {
 
 const buildStartMessage = () => {
   return "Begin the interview now. Ask Question 1/20 only. No greeting or introduction.";
+};
+
+const buildQuestionSystemMessage = (contextPrompt?: string, count = 10) => {
+  const contextText = contextPrompt?.trim() || "Not provided";
+  return [
+    "You are an interview coach creating a tailored question set.",
+    "Goal: Generate role-specific, open-ended interview questions for a candidate.",
+    "Return ONLY valid JSON as an array of objects with this shape:",
+    `{ "id": "q-1", "prompt": "question text", "category": "Category Name" }`,
+    `Generate exactly ${count} questions.`,
+    "Rules:",
+    "- Use ids q-1 ... q-10 (or up to q-N based on count).",
+    "- Make questions specific to the context provided.",
+    "- Mix categories like Introduction, Subject Knowledge, Classroom Management, Pedagogy, Assessment, Communication, Collaboration, Ethics, and Growth Mindset.",
+    "- Avoid multiple-choice; use free-response prompts.",
+    "- No extra text outside JSON.",
+    "Context provided by user (verbatim):",
+    contextText,
+  ].join("\n");
 };
 
 const buildReportSystemMessage = (
@@ -165,13 +192,27 @@ export default async function handler(
               }),
             },
           ]
-        : [
-            { role: "system", content: buildSystemMessage(body.contextPrompt) },
-            ...(body.start
-              ? [{ role: "user", content: buildStartMessage() } as OpenAIMessage]
-              : []),
-            ...inboundMessages,
-          ];
+        : mode === "questions"
+          ? [
+              {
+                role: "system",
+                content: buildQuestionSystemMessage(
+                  body.contextPrompt,
+                  body.questionCount ?? 10
+                ),
+              },
+              {
+                role: "user",
+                content: "Generate the questions now.",
+              },
+            ]
+          : [
+              { role: "system", content: buildSystemMessage(body.contextPrompt) },
+              ...(body.start
+                ? [{ role: "user", content: buildStartMessage() } as OpenAIMessage]
+                : []),
+              ...inboundMessages,
+            ];
 
     const response = await fetch(OPENAI_URL, {
       method: "POST",
@@ -206,6 +247,18 @@ export default async function handler(
         return res.status(200).json({ report });
       } catch {
         return res.status(200).json({ report: reply });
+      }
+    }
+
+    if (mode === "questions") {
+      try {
+        const parsed = JSON.parse(reply) as InterviewQuestion[];
+        if (!Array.isArray(parsed)) {
+          throw new Error("Questions response was not an array.");
+        }
+        return res.status(200).json({ questions: parsed });
+      } catch {
+        return res.status(502).json({ message: "Questions were not returned in JSON." });
       }
     }
 

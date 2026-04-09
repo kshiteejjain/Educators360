@@ -43,11 +43,11 @@ const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: st
     "Return STRICT JSON only, no extra text, using this schema:",
     `{
   "score": 0-100,
-  "summary": "2-3 sentence overview",
+  "summary": "Max 30 words or 250 characters.",
   "strengths": ["item1","item2","item3"],
   "improvements": ["item1","item2","item3","item4"],
   "suggestions": ["item1","item2","item3","item4"],
-  "rewriteSummary": "Improved professional summary (80-140 words)",
+  "rewriteSummary": "Improved professional summary Max 3 lines.",
   "keywords": ["keyword1","keyword2","keyword3","keyword4","keyword5","keyword6","keyword7","keyword8"],
   "parsedResume": {
     "name": "",
@@ -57,9 +57,11 @@ const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: st
     "phone": "",
     "photo": "",
     "summary": "",
-    "skills": [{"name":"","rating":3}],
-    "languages": [],
-    "experiences": [{"role":"","company":"","dates":"","bullets":[""]}],
+    "skills": [{"name":"","rating":3}, max 6 skills],
+    "certifications": [check in additional information section, certification section and if not specified, add 1 certificate based on skills],
+    "languages": ["add hindi, english by default if not specified."],
+    "experiences": [{"role":"","company":"","dates":"","bullets":["Max 3 most recent jobs."]}],
+    *Bullets:* Select the *best 3-4 bullets* per job and rewrite them.
     "education": [{"school":"","degree":"","dates":""}],
     "projects": [{"name":"","dates":"","summary":"","tech":""}]
   }

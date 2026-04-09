@@ -872,7 +872,7 @@ export default function Assessment() {
       silenceTimeoutRef.current = window.setTimeout(() => {
         if (!recordingQuestionIdRef.current) return;
         recognition.stop();
-      }, 5000); // 8 seconds of silence
+      }, 5000);
     };
 
     recognition.onresult = (event: any) => {
@@ -953,11 +953,6 @@ export default function Assessment() {
 
     setSpeechError("");
 
-    if (recordingQuestionIdRef.current === questionId) {
-      recognitionRef.current.stop();
-      return;
-    }
-
     if (recordingQuestionIdRef.current) {
       pendingRecordingStartRef.current = questionId;
       recognitionRef.current.stop();
@@ -968,14 +963,14 @@ export default function Assessment() {
     setRecordingQuestionId(questionId);
     try {
       recognitionRef.current.start();
-      // stop if user goes quiet for >8s
+      // stop if user goes quiet for >5s
       if (typeof window !== "undefined") {
         if (silenceTimeoutRef.current) {
           clearTimeout(silenceTimeoutRef.current);
         }
         silenceTimeoutRef.current = window.setTimeout(() => {
           recognitionRef.current?.stop();
-        }, 8000);
+        }, 5000);
       }
     } catch (err) {
       setSpeechError("Unable to start speech recording.");
@@ -1221,14 +1216,17 @@ export default function Assessment() {
                             isRecording ? styles.recordButtonActive : ""
                           }`}
                           onClick={() => toggleRecordingForQuestion(item.id)}
-                          aria-label={isRecording ? "Stop recording" : "Record answer"}
+                          aria-label="Start recording"
+                          disabled={isRecording}
                         >
-                          {isRecording ? "Stop recording" : "Record answer"}
+                          <img src="/mic.svg" alt="Mic" width={18} height={18} />
                         </button>
                       )}
                     </div>
-                                        {isRecording && (
-                      <div className={styles.speechHint}>Recording... click button again to stop.</div>
+                    {isRecording && (
+                      <div className={styles.speechHint}>
+                        Recording... will stop after 5 seconds of silence.
+                      </div>
                     )}
                   </div>
                 );
