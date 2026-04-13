@@ -103,7 +103,7 @@ export default function AIInterview() {
   const [questionLoading, setQuestionLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scoreChartRef = useRef<Chart<"doughnut", number[], string> | null>(null);
-  const completionChartRef = useRef<Chart<"bar", number[], string> | null>(null);
+  const completionChartRef = useRef<Chart<"doughnut", number[], string> | null>(null);
   const scoreCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const completionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const recognitionRef = useRef<any>(null);
@@ -276,28 +276,26 @@ export default function AIInterview() {
     }
 
     if (completionCanvasRef.current) {
-      completionChartRef.current = new Chart<"bar", number[], string>(
+      completionChartRef.current = new Chart<"doughnut", number[], string>(
         completionCanvasRef.current,
         {
-        type: "bar",
+        type: "doughnut",
         data: {
           labels: ["Answered", "Remaining"],
           datasets: [
             {
               data: completionData,
               backgroundColor: ["#0ea5e9", "#e2e8f0"],
-              borderRadius: 8,
-              barThickness: 24,
+              borderWidth: 0,
             },
           ],
         },
         options: {
-          indexAxis: "y",
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { display: false, suggestedMax: totalQuestions },
-            y: { display: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: true },
           },
+          cutout: "70%",
         },
       }
       );
@@ -695,7 +693,12 @@ export default function AIInterview() {
                         </div>
                         <div className={styles.chartCard}>
                           <div className={styles.chartTitle}>Completion</div>
-                          <canvas ref={completionCanvasRef} height={140} />
+                          <canvas
+                            ref={completionCanvasRef}
+                            className={styles.scoreChartCanvas}
+                            width={180}
+                            height={180}
+                          />
                         </div>
                       </div>
 

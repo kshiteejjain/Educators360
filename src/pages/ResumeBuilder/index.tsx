@@ -167,44 +167,55 @@ export default function ResumeBuilder() {
   const hasHydratedTargetRole = useRef(false);
 
   const applyNavyPageSpacing = () => {
-    const root = previewRef.current;
-    if (!root) return;
-    const navyWrapper =
-      root.querySelector<HTMLElement>("[data-resume-template=\"navy\"]") ??
-      root.querySelector<HTMLElement>(`.${styles.navyWrapper}`);
-    if (!navyWrapper) return;
+    if (typeof window === "undefined") return;
+    const wrapper = previewRef.current;
+    if (!wrapper) return;
+    const main = wrapper.querySelector<HTMLElement>("[data-resume-main]");
+    if (!main) return;
 
-    const pageHeightRaw = getComputedStyle(navyWrapper).getPropertyValue("--navy-page-height");
-    const pageHeight = Number(pageHeightRaw.replace("px", "").trim());
-    if (!Number.isFinite(pageHeight) || pageHeight <= 0) return;
+    const parseLengthToPx = (value: string) => {
+      const raw = value.trim();
+      if (!raw) return 0;
+      const number = Number.parseFloat(raw);
+      if (Number.isNaN(number)) return 0;
+      if (raw.endsWith("mm")) return (number * 96) / 25.4;
+      if (raw.endsWith("cm")) return (number * 96) / 2.54;
+      if (raw.endsWith("in")) return number * 96;
+      return number;
+    };
 
-    const navyMain =
-      navyWrapper.querySelector<HTMLElement>("[data-resume-main]") ??
-      navyWrapper.querySelector<HTMLElement>(`.${styles.navyMain}`);
-    if (!navyMain) return;
-    const navySidebar =
-      navyWrapper.querySelector<HTMLElement>("[data-resume-sidebar]") ??
-      navyWrapper.querySelector<HTMLElement>(`.${styles.navySidebar}`);
-    if (!navySidebar) return;
+    const style = window.getComputedStyle(wrapper);
+    const pageHeightPx =
+      parseLengthToPx(style.getPropertyValue("--navy-page-height")) || 1122;
 
-    const blocks = navyMain.querySelectorAll<HTMLElement>("[data-page-block]");
-    blocks.forEach((block) => block.classList.remove("pageBreakStart"));
-
-    let lastPageIndex = 0;
-    blocks.forEach((block, index) => {
-      const top = block.offsetTop;
-      const pageIndex = Math.floor((top + 1) / pageHeight);
-      if (index > 0 && pageIndex > lastPageIndex) {
-        block.classList.add("pageBreakStart");
-      }
-      lastPageIndex = Math.max(lastPageIndex, pageIndex);
+    const blocks = Array.from(
+      main.querySelectorAll<HTMLElement>("[data-page-block]")
+    );
+    blocks.forEach((block) => {
+      block.style.marginTop = "";
+      block.removeAttribute("data-page-offset");
     });
 
-    const contentHeight = Math.max(navyMain.scrollHeight, navySidebar.scrollHeight);
-    const pageCount = Math.max(1, Math.ceil(contentHeight / pageHeight));
-    const fullHeight = pageCount * pageHeight;
-    navyWrapper.style.minHeight = `${fullHeight}px`;
-    navySidebar.style.minHeight = `${fullHeight}px`;
+    const wrapperRect = wrapper.getBoundingClientRect();
+
+    blocks.forEach((block) => {
+      const rect = block.getBoundingClientRect();
+      const top = rect.top - wrapperRect.top;
+      const height = rect.height;
+      if (height <= 0) return;
+      const pageBottom = (Math.floor(top / pageHeightPx) + 1) * pageHeightPx;
+      if (top < pageBottom && top + height > pageBottom) {
+        if (height > pageHeightPx * 0.9) return;
+        const offset = pageBottom - top;
+        block.style.marginTop = `${Math.ceil(offset)}px`;
+        block.setAttribute("data-page-offset", "true");
+      }
+    });
+
+    const totalHeight = wrapper.scrollHeight;
+    const totalPages = Math.max(1, Math.ceil(totalHeight / pageHeightPx));
+    wrapper.style.setProperty("--navy-page-height", `${pageHeightPx}px`);
+    wrapper.style.minHeight = `${totalPages * pageHeightPx}px`;
   };
 
   const scrollToPreviewHeader = () => {
@@ -221,16 +232,7 @@ export default function ResumeBuilder() {
   }, [aiResult]);
 
   useEffect(() => {
-    if (previewTemplate !== "navy") return;
-    const handle = () => {
-      window.requestAnimationFrame(() => applyNavyPageSpacing());
-    };
-    const raf = window.requestAnimationFrame(handle);
-    window.addEventListener("resize", handle);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.removeEventListener("resize", handle);
-    };
+    // Page splitting is handled during PDF generation only.
   }, [previewTemplate, form]);
 
   useEffect(() => {
@@ -602,10 +604,6 @@ export default function ResumeBuilder() {
 
         const target = previewRef.current;
         if (!target) return;
-        if (previewTemplate === "navy") {
-          applyNavyPageSpacing();
-        }
-
         const nameSlug = (form.name || "resume").replace(/\s+/g, "-").toLowerCase();
         const roleSlug = (form.title || selectedTemplate.title || "role")
           .replace(/\s+/g, "-")
@@ -613,20 +611,29 @@ export default function ResumeBuilder() {
         const filename = `${nameSlug}-${roleSlug}.pdf`;
         const resumeHtml = target.outerHTML;
         const styleTags = Array.from(
-          document.querySelectorAll("style, link[rel=\"stylesheet\"]")
+          document.querySelectorAll(
+            "style, link[rel=\"stylesheet\"], link[rel=\"preload\"][as=\"font\"], link[rel=\"preconnect\"]"
+          )
         )
-          .map((node) => {
-            if (node.tagName.toLowerCase() === "style") {
-              return node.outerHTML;
-            }
-            const link = node as HTMLLinkElement;
-            if (!link.href) return "";
-            return `<link rel="stylesheet" href="${link.href}">`;
-          })
+          .map((node) => node.outerHTML)
           .filter(Boolean)
           .join("\n");
 
-        const html = `<!doctype html><html class="pdf-export"><head>${styleTags}</head><body class="pdf-export">${resumeHtml}</body></html>`;
+        const fontBase = `${window.location.origin}/fonts`;
+        const fontFaces = `
+<style>
+@font-face { font-family: "Ubuntu"; src: url("${fontBase}/Ubuntu-Light.woff2") format("woff2"), url("${fontBase}/Ubuntu-Light.woff") format("woff"); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ubuntu"; src: url("${fontBase}/Ubuntu-LightItalic.woff2") format("woff2"), url("${fontBase}/Ubuntu-LightItalic.woff") format("woff"); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: "Ubuntu"; src: url("${fontBase}/Ubuntu-Regular.woff2") format("woff2"), url("${fontBase}/Ubuntu-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ubuntu"; src: url("${fontBase}/Ubuntu-Italic.woff2") format("woff2"), url("${fontBase}/Ubuntu-Italic.woff") format("woff"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Ubuntu"; src: url("${fontBase}/Ubuntu-Medium.woff2") format("woff2"), url("${fontBase}/Ubuntu-Medium.woff") format("woff"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ubuntu"; src: url("${fontBase}/Ubuntu-MediumItalic.woff2") format("woff2"), url("${fontBase}/Ubuntu-MediumItalic.woff") format("woff"); font-weight: 500; font-style: italic; font-display: swap; }
+@font-face { font-family: "Ubuntu"; src: url("${fontBase}/Ubuntu-Bold.woff2") format("woff2"), url("${fontBase}/Ubuntu-Bold.woff") format("woff"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Ubuntu"; src: url("${fontBase}/Ubuntu-BoldItalic.woff2") format("woff2"), url("${fontBase}/Ubuntu-BoldItalic.woff") format("woff"); font-weight: 700; font-style: italic; font-display: swap; }
+</style>
+`;
+
+        const html = `<!doctype html><html class="pdf-export"><head>${styleTags}${fontFaces}</head><body class="pdf-export">${resumeHtml}</body></html>`;
 
         const response = await fetch("/api/generate-pdf", {
           method: "POST",
@@ -1059,16 +1066,6 @@ export default function ResumeBuilder() {
               ))}
             </ul>
           </div>
-          {form.certifications.length > 0 && (
-            <div className={styles.sidebarBlock}>
-              <h4>CERTIFICATIONS</h4>
-              <ul>
-                {form.certifications.map((cert, idx) => (
-                  <li key={idx}>{cert}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
 
         <div className={styles.navyMain} data-resume-main>
@@ -1101,6 +1098,20 @@ export default function ResumeBuilder() {
               ))}
             </ul>
           </div>
+          {form.certifications.length > 0 && (
+            <div
+              className={styles.resumeSection}
+              data-page-block
+              data-section="certifications"
+            >
+              <h4>CERTIFICATIONS</h4>
+              <ul className={styles.resumeList}>
+                {form.certifications.map((cert, idx) => (
+                  <li key={idx}>{cert}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     );
