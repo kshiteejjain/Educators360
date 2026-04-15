@@ -26,7 +26,7 @@
 
 .inputCard {
   position: relative;
-  background: linear-gradient(135deg, var(--color-white), var(--color-blue-gray));
+  background-color: var(--color-white);
   border-radius: 16px;
   padding: 22px;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -62,6 +62,7 @@
   box-shadow:
     0 24px 40px rgba(15, 23, 42, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  opacity: 1;
 }
 
 .cardActive {
@@ -71,16 +72,6 @@
 }
 
 .cardInactive {
-  opacity: 0.5;
-  filter: none;
-}
-
-.inputCards:hover .cardActive {
-  opacity: 0.5;
-  filter: none;
-}
-
-.inputCards:hover .inputCard:hover {
   opacity: 1;
   filter: none;
 }
@@ -93,15 +84,25 @@
 }
 
 .cardHeader h3 {
-  margin: 0 0 6px 0;
-  font-size: 1.15rem;
+  margin: 0 0 15px 0;
+  font-size: calc(var(--font-size-base) + 5px);
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-black);
 }
 
 .cardHeader p {
   margin: 0;
-  font-size: 0.95rem;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.cardHeader ul {
+  margin: 8px 0 0 18px;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.cardHeader ul li {
   color: var(--color-text);
   line-height: 1.5;
 }
@@ -176,12 +177,17 @@
   color: var(--color-black);
 }
 .audioWidgetWrap {
-  background: var(--color-blue-gray);
+  background: radial-gradient(
+    120% 120% at 10% 0%,
+    #ffffff 0%,
+    #e3f1f5 45%,
+    #d6ecf3 100%
+  );
   border: 1px solid var(--color-gray);
-  border-radius: 18px;
-  padding: 32px;
-  box-shadow: 0 18px 40px var(--color-rgba-0-0-0-008);
-  min-height: 70vh;
+  border-radius: 24px;
+  padding: 48px 36px;
+  box-shadow: 0 24px 48px var(--color-rgba-0-0-0-008);
+  min-height: 75vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -198,7 +204,7 @@
   left: auto !important;
   top: auto !important;
   margin: 0 auto;
-  width: min(640px, 100%);
+  width: min(900px, 100%);
   max-width: 100%;
   font-size: calc(var(--font-size-base) + 2px);
 }
@@ -208,8 +214,9 @@
   position: static !important;
   inset: auto !important;
   margin: 0 auto;
-  width: min(640px, 100%) !important;
+  width: min(900px, 100%) !important;
   max-width: 100% !important;
+  height: 520px !important;
 }
 
 .panel {

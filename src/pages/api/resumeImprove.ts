@@ -27,6 +27,7 @@ type AiResumeResult = {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const RESUME_AI_DEBUG = process.env.RESUME_AI_DEBUG === "true";
 
 const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: string) => {
   const targetLine = targetJob ? `Target job: ${targetJob}` : "Target job: Not provided";
@@ -39,7 +40,14 @@ const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: st
     "Analyze the resume text and provide improvement feedback.",
     "Use the target job to tailor the rewritten profile summary. If the target job is provided, rewriteSummary must be aligned to that role while remaining truthful to the resume content.",
     "Extract and populate the parsedResume strictly from the resume content. Do not omit sections that exist; use empty strings only if truly missing.",
-    "For experiences: split each distinct company/role/date range into its own item. Do NOT merge multiple jobs into one. If dates or companies change, start a new experience entry. Please treat the following companies as distinct, even if they have similar job roles or overlapping dates",
+    "For experiences: split each distinct company/role/date range into its own item. Do NOT merge multiple jobs into one. If dates or companies change, start a new experience entry.",
+    "CRITICAL: company must contain exactly one employer name per experience item. Never concatenate two employers in one company field (e.g., do not output 'UPEDUCATORS RUH CONTINUUM').",
+    "If a line contains role and company together, separate them correctly so role stays in role and employer stays in company.",
+    "For the Classic resume template, WORK EXPERIENCE must follow this structure for every experience item: role, company, dates, and exactly 3 bullet points.",
+    "For education: keep the existing structure exactly as school, degree, dates.",
+    "For education.dates: preserve the score/result in the same single-line pattern used in the resume. If the value is percentage-based, always include the % sign (example: 59.2%). If the value is CGPA-based, keep CGPA exactly as written (example: 9.48 CGPA or 9.6 CGPA). Do not convert CGPA to percentage and do not drop the % sign from percentage marks.",
+    "Rewrite each experience bullet in concise resume language. Each bullet should start with a strong action verb, be one sentence, and avoid first-person language, headings, numbering, or filler text.",
+    "If the source resume has fewer than 3 bullets for a role, infer truthful, resume-safe bullets from the described responsibilities so that every experience item still has exactly 3 bullets.",
     "Return STRICT JSON only, no extra text, using this schema:",
     `{
   "score": 0-100,
@@ -47,7 +55,7 @@ const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: st
   "strengths": ["item1","item2","item3"],
   "improvements": ["item1","item2","item3","item4"],
   "suggestions": ["item1","item2","item3","item4"],
-  "rewriteSummary": "Improved professional summary Max 3 lines.",
+  "rewriteSummary": "Improved professional summary Max 3-5 lines depending on content of resume.",
   "keywords": ["keyword1","keyword2","keyword3","keyword4","keyword5","keyword6","keyword7","keyword8"],
   "parsedResume": {
     "name": "",
@@ -60,8 +68,7 @@ const buildPrompt = (userResume: string, targetJob?: string, jobDescription?: st
     "skills": [{"name":"","rating":3}, max 6 skills],
     "certifications": [check in additional information section, certification section and if not specified, add 1 certificate based on skills],
     "languages": ["add hindi, english by default if not specified."],
-    "experiences": [{"role":"","company":"","dates":"","bullets":["Max 3 most recent jobs."]}],
-    *Bullets:* Select the *best 3-4 bullets* per job and rewrite them.
+    "experiences": [{"role":"","company":"","dates":"","bullets":["bullet 1","bullet 2","bullet 3"]}],
     "education": [{"school":"","degree":"","dates":""}],
     "projects": [{"name":"","dates":"","summary":"","tech":""}]
   }
@@ -89,7 +96,7 @@ interface ResumeTemplate {
   projects: { name: string; dates: string; summary: string; tech: string }[];
 }
 
-const emptyState = (template: any): ResumeTemplate => {
+const emptyState = (template: Partial<ResumeTemplate>): ResumeTemplate => {
   return {
     name: '',
     title: '',
@@ -134,16 +141,197 @@ const safeArray = <T>(value: unknown): T[] => {
   return Array.isArray(value) ? value : []; // If it's an array, return it; otherwise return an empty array
 };
 
+const normalizeToken = (value: string): string =>
+  value.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+
+const looksLikeDateLine = (line: string): boolean =>
+  /\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|SEPT|OCT|NOV|DEC|PRESENT|DATE|TILL|TO|UNTIL|CURRENT|20\d{2})\b/i.test(
+    line
+  );
+
+const headerKeywords = [
+  "WORK EXPERIENCE",
+  "EXPERIENCE",
+  "CAREER PROGRESSION",
+  "PROFILE",
+  "SUMMARY",
+  "EDUCATION",
+  "SKILLS",
+  "CERTIFICATIONS",
+  "LANGUAGES",
+  "PROJECTS",
+];
+
+const isLikelyCompanyLine = (line: string): boolean => {
+  const clean = line.replace(/\s+/g, " ").trim();
+  if (!clean || clean.length < 3 || clean.length > 90) return false;
+  if (looksLikeDateLine(clean)) return false;
+  if (headerKeywords.some((keyword) => normalizeToken(clean) === normalizeToken(keyword))) {
+    return false;
+  }
+  if (/^[\u2022\-*]/.test(clean)) return false;
+  if (/\b(HOD|FACILITATOR|TEACHER|TRAINER|MANAGER|ENGINEER|DEVELOPER|LEAD|INTERN)\b/i.test(clean)) {
+    return false;
+  }
+  return /[A-Za-z]/.test(clean) && /[A-Z]/.test(clean);
+};
+
+const extractCompanyCandidates = (resumeText: string): string[] => {
+  const lines = resumeText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const candidates: string[] = [];
+  for (const line of lines) {
+    if (line.includes(":")) {
+      const afterColon = line.split(":").slice(1).join(":").trim();
+      if (isLikelyCompanyLine(afterColon)) candidates.push(afterColon);
+    }
+    if (isLikelyCompanyLine(line)) {
+      candidates.push(line);
+    }
+  }
+
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = normalizeToken(candidate);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const inferCompanyFromSource = (
+  resumeText: string,
+  role: string,
+  dates: string
+): string => {
+  const lines = resumeText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (!lines.length) return "";
+
+  const normalizedRole = normalizeToken(role);
+  const normalizedDates = normalizeToken(dates);
+
+  let anchorIndex = -1;
+  if (normalizedDates) {
+    anchorIndex = lines.findIndex((line) =>
+      normalizeToken(line).includes(normalizedDates)
+    );
+  }
+  if (anchorIndex === -1 && normalizedRole) {
+    anchorIndex = lines.findIndex((line) =>
+      normalizeToken(line).includes(normalizedRole)
+    );
+  }
+  if (anchorIndex === -1) anchorIndex = 0;
+
+  const start = Math.max(0, anchorIndex - 3);
+  const end = Math.min(lines.length - 1, anchorIndex + 2);
+
+  // First pass: prioritize explicit role:company patterns.
+  for (let i = start; i <= end; i += 1) {
+    const line = lines[i];
+    if (line.includes(":")) {
+      const afterColon = line.split(":").slice(1).join(":").trim();
+      if (isLikelyCompanyLine(afterColon)) return afterColon;
+    }
+  }
+
+  // Second pass: fallback to standalone company-like lines.
+  for (let i = start; i <= end; i += 1) {
+    const line = lines[i];
+    if (isLikelyCompanyLine(line)) return line;
+  }
+  return "";
+};
+
+const tokenize = (value: string): string[] =>
+  normalizeToken(value)
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
+
+const overlapCount = (a: string, b: string): number => {
+  const aSet = new Set(tokenize(a));
+  const bTokens = tokenize(b);
+  let count = 0;
+  for (const token of bTokens) {
+    if (aSet.has(token)) count += 1;
+  }
+  return count;
+};
+
+const fixMergedCompanyName = (
+  company: string,
+  role: string,
+  dates: string,
+  resumeText: string
+): string => {
+  const current = safeString(company);
+  if (!current) return current;
+
+  const candidates = extractCompanyCandidates(resumeText);
+  const normalizedCurrent = normalizeToken(current);
+  const matchedCandidates = candidates.filter((candidate) => {
+    const normalizedCandidate = normalizeToken(candidate);
+    if (!normalizedCandidate) return false;
+    return (
+      normalizedCurrent.includes(normalizedCandidate) ||
+      overlapCount(current, candidate) >= Math.min(2, tokenize(candidate).length)
+    );
+  });
+
+  const splitByDelimiters = current
+    .split(/\s*(?:\/|\||,|\band\b|\&)\s*/i)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const inferred = inferCompanyFromSource(resumeText, role, dates);
+  const normalizedInferred = normalizeToken(inferred);
+
+  if (
+    inferred &&
+    normalizedInferred &&
+    normalizedCurrent !== normalizedInferred &&
+    (normalizedCurrent.includes(normalizedInferred) ||
+      overlapCount(current, inferred) >= Math.min(2, tokenize(inferred).length))
+  ) {
+    return inferred;
+  }
+
+  const appearsMerged = matchedCandidates.length > 1 || splitByDelimiters.length > 1;
+  if (!appearsMerged) return current;
+  if (!inferred) return matchedCandidates[0] ?? splitByDelimiters[0] ?? current;
+
+  const inferredFromMatched = matchedCandidates.find(
+    (candidate) => normalizeToken(candidate) === normalizedInferred
+  );
+  if (inferredFromMatched) return inferredFromMatched;
+
+  const inferredFromSplit = splitByDelimiters.find(
+    (candidate) => normalizeToken(candidate) === normalizedInferred
+  );
+  return inferredFromSplit ?? inferred ?? current;
+};
+
 const normalizeParsedResume = (parsed?: ResumeTemplate): ResumeTemplate | null => {
   if (!parsed) return null;
 
   // Process experiences, ensuring clear separation of roles and companies
-  const experiences = safeArray(parsed.experiences)
-    .map((exp: any) => ({
+  const experiences = safeArray<Record<string, unknown>>(parsed.experiences)
+    .map((exp: Record<string, unknown>) => ({
       role: safeString(exp?.role),
       company: safeString(exp?.company),  // Ensure company names are separate
       dates: safeString(exp?.dates),
-      bullets: safeArray(exp?.bullets).map((bullet) => safeString(bullet)).filter(Boolean),
+      bullets: safeArray(exp?.bullets)
+        .map((bullet) => safeString(bullet))
+        .filter(Boolean)
+        .slice(0, 3),
     }))
     .filter((exp) => exp.role || exp.company || exp.dates || exp.bullets.length > 0);
 
@@ -202,27 +390,32 @@ const callGemini = async (prompt: string) => {
   return content;
 };
 
-const parseJson = (text: string): AiResumeResult => {
+const parseJson = (text: string, sourceResumeText = ""): AiResumeResult => {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON found in AI response");
   const parsed = JSON.parse(match[0]) as AiResumeResult;
 
-  // Ensure that experiences with different companies or roles are treated separately
-  const distinctExperiences = parsed.parsedResume?.experiences.map((exp: any, index: number) => {
-    if (index > 0 && exp.company !== parsed.parsedResume?.experiences[index - 1]?.company) {
-      // Treat this experience as a new one
+  const rawExperiences = safeArray<Record<string, unknown>>(parsed?.parsedResume?.experiences);
+  const normalizedExperiences = rawExperiences
+    .map((exp: Record<string, unknown>) => {
+      const role = safeString(exp?.role);
+      const dates = safeString(exp?.dates);
       return {
         ...exp,
-        role: safeString(exp?.role),
-        company: safeString(exp?.company),
-        dates: safeString(exp?.dates),
-        bullets: safeArray<string>(exp?.bullets).map(bullet => safeString(bullet)),
+        role,
+        company: fixMergedCompanyName(safeString(exp?.company), role, dates, sourceResumeText),
+        dates,
+        bullets: safeArray<string>(exp?.bullets)
+          .map((bullet) => safeString(bullet))
+          .filter(Boolean)
+          .slice(0, 3),
       };
-    }
-    return exp; // Keep merging if it's the same company and role
-  });
+    })
+    .filter((exp) => exp.role || exp.company || exp.dates || exp.bullets.length > 0);
 
-  parsed.parsedResume.experiences = distinctExperiences;
+  if (parsed?.parsedResume) {
+    parsed.parsedResume.experiences = normalizedExperiences;
+  }
 
   return parsed;
 };
@@ -245,9 +438,25 @@ export default async function handler(
   }
 
   try {
+    if (RESUME_AI_DEBUG) {
+      console.info("resumeImprove request", {
+        resumeChars: userResume.length,
+        targetJobChars: targetJob.length,
+        jobDescriptionChars: jobDescription.length,
+      });
+    }
     const prompt = buildPrompt(userResume, targetJob, jobDescription);
+    if (RESUME_AI_DEBUG) {
+      console.info("resumeImprove prompt preview", prompt.slice(0, 600));
+    }
     const content = await callGemini(prompt);
-    const parsed = parseJson(content);
+    if (RESUME_AI_DEBUG) {
+      console.info("resumeImprove ai raw preview", content.slice(0, 800));
+    }
+    const parsed = parseJson(content, userResume);
+    if (RESUME_AI_DEBUG) {
+      console.info("resumeImprove normalized experiences", parsed?.parsedResume?.experiences);
+    }
     return res.status(200).json(parsed);
   } catch (error) {
     if (error instanceof OpenAIRequestError) {

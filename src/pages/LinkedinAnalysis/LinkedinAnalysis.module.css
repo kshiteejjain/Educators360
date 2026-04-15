@@ -32,7 +32,7 @@
   display: flex;
   gap: 14px;
   align-items: center;
-  background: linear-gradient(135deg, var(--color-white), var(--color-blue-gray));
+  background-color: var(--color-white);
   border: 1px solid var(--color-error);
   border-radius: 14px;
   padding: 16px 18px;
@@ -91,12 +91,12 @@
 .inputCards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
+  gap: 50px;
 }
 
 .inputCard {
   position: relative;
-  background: linear-gradient(135deg, var(--color-white), var(--color-blue-gray));
+  background-color: var(--color-white);
   border-radius: 16px;
   padding: 26px;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -131,6 +131,7 @@
   box-shadow:
     0 24px 40px rgba(15, 23, 42, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  opacity: 1;
 }
 
 .cardActive {
@@ -140,22 +141,12 @@
 }
 
 .cardInactive {
-  opacity: 0.5;
-  filter: none;
-}
-
-.inputCards:hover .cardActive {
-  opacity: 0.5;
-  filter: none;
-}
-
-.inputCards:hover .inputCard:hover {
   opacity: 1;
   filter: none;
 }
 
 .noLinkedinCard {
-  background: linear-gradient(135deg, var(--color-white), var(--color-blue-gray));
+  background-color: var(--color-white);
 }
 
 .cardHeader {
@@ -174,9 +165,15 @@
 
 .cardHeader p {
   margin: 0;
-  font-size: 0.95rem;
   color: var(--color-text);
   line-height: 1.5;
+}
+.cardHeader ul{
+  list-style-type: disc;
+}
+
+.cardHeader ul li{
+color: var(--color-text);
 }
 
 .cardBadge {
@@ -198,7 +195,6 @@
 .cardBody {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .cardButton {
@@ -668,7 +664,7 @@
 }
 
 .actionCard {
-  background: linear-gradient(135deg, var(--color-white), var(--color-blue-gray));
+  background-color: var(--color-white);
   border: 1px solid var(--color-gray);
   border-radius: 12px;
   padding: 24px;

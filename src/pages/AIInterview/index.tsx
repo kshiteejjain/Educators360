@@ -552,9 +552,15 @@ export default function AIInterview() {
                   <div>
                     <h3>💬 Chat Interview</h3>
                     <p>
-                      Practice structured interview questions with instant AI feedback
-                      and guided follow-ups.
+                      Run a realistic, text-based interview with your AI coach.
+                      Perfect for practicing structure, clarity, and confidence before
+                      the real thing.
                     </p>
+                    <ul>
+                      <li>Structured questions with instant AI feedback</li>
+                      <li>Guided follow-ups tailored to your role</li>
+                      <li>STAR-style coaching with clear strengths and gaps</li>
+                    </ul>
                   </div>
                   <span className={styles.cardBadge}>AI Chat</span>
                 </div>
@@ -578,9 +584,14 @@ export default function AIInterview() {
                   <div>
                     <h3>🎤 AI Audio Interview</h3>
                     <p>
-                      Simulate a live voice interview with real-time listening, pacing,
-                      and response cues.
+                      Practice speaking aloud with a live, voice-first interview flow.
+                      Build composure and delivery with immediate, actionable feedback.
                     </p>
+                    <ul>
+                      <li>Live voice simulation with pacing cues</li>
+                      <li>Real-time listening for natural flow</li>
+                      <li>Delivery tips on clarity, filler words, and structure</li>
+                    </ul>
                   </div>
                   <span className={styles.cardBadge}>Voice</span>
                 </div>

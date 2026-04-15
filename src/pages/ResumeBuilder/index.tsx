@@ -245,23 +245,23 @@ export default function ResumeBuilder() {
       if (!resumeRecord || typeof resumeRecord !== "object") return;
       const resumeData =
         (resumeRecord as Record<string, unknown>)?.data &&
-        typeof (resumeRecord as Record<string, unknown>).data === "object"
+          typeof (resumeRecord as Record<string, unknown>).data === "object"
           ? ((resumeRecord as Record<string, unknown>).data as Record<string, unknown>)
           : null;
       if (!resumeData) return;
 
       const normalizedSkills = Array.isArray(resumeData.skills)
         ? (resumeData.skills as unknown[]).map((skill) =>
-            typeof skill === "string"
-              ? { name: skill, rating: 3 }
-              : {
-                  name: String((skill as Record<string, unknown>)?.name ?? ""),
-                  rating: Math.max(
-                    1,
-                    Math.min(5, Number((skill as Record<string, unknown>)?.rating ?? 3))
-                  ),
-                }
-          )
+          typeof skill === "string"
+            ? { name: skill, rating: 3 }
+            : {
+              name: String((skill as Record<string, unknown>)?.name ?? ""),
+              rating: Math.max(
+                1,
+                Math.min(5, Number((skill as Record<string, unknown>)?.rating ?? 3))
+              ),
+            }
+        )
         : [];
 
       const nextForm: ResumeTemplate = {
@@ -285,22 +285,22 @@ export default function ResumeBuilder() {
           : {}),
         experiences: Array.isArray(resumeData.experiences)
           ? (resumeData.experiences as unknown[]).map((exp) => ({
-              role: String((exp as Record<string, unknown>)?.role ?? ""),
-              company: String((exp as Record<string, unknown>)?.company ?? ""),
-              dates: String((exp as Record<string, unknown>)?.dates ?? ""),
-              bullets: Array.isArray((exp as Record<string, unknown>)?.bullets)
-                ? ((exp as Record<string, unknown>)?.bullets as unknown[]).map(
-                    (bullet) => String(bullet)
-                  )
-                : [],
-            }))
+            role: String((exp as Record<string, unknown>)?.role ?? ""),
+            company: String((exp as Record<string, unknown>)?.company ?? ""),
+            dates: String((exp as Record<string, unknown>)?.dates ?? ""),
+            bullets: Array.isArray((exp as Record<string, unknown>)?.bullets)
+              ? ((exp as Record<string, unknown>)?.bullets as unknown[]).map(
+                (bullet) => String(bullet)
+              )
+              : [],
+          }))
           : [],
         education: Array.isArray(resumeData.education)
           ? (resumeData.education as unknown[]).map((edu) => ({
-              school: String((edu as Record<string, unknown>)?.school ?? ""),
-              degree: String((edu as Record<string, unknown>)?.degree ?? ""),
-              dates: String((edu as Record<string, unknown>)?.dates ?? ""),
-            }))
+            school: String((edu as Record<string, unknown>)?.school ?? ""),
+            degree: String((edu as Record<string, unknown>)?.degree ?? ""),
+            dates: String((edu as Record<string, unknown>)?.dates ?? ""),
+          }))
           : [],
       };
 
@@ -813,10 +813,21 @@ export default function ResumeBuilder() {
           );
           return;
         }
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("resumeImprove payload", {
+            resumeChars: extractedText.length,
+            targetJob: targetJob.trim(),
+            jobDescription: targetJob.trim(),
+          });
+          console.debug("resumeImprove response experiences", data?.parsedResume?.experiences);
+        }
         setAiResult(data);
         const targetJobValue = targetJob.trim();
         if (data.parsedResume) {
           const normalized = normalizeParsedResume(data.parsedResume);
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("resumeImprove normalized form experiences", normalized?.experiences);
+          }
           if (normalized) {
             setForm((prev) => ({
               ...prev,
@@ -891,23 +902,105 @@ export default function ResumeBuilder() {
     if (!parsed) return null;
     const safeString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
     const safeArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+    const normalizeToken = (value: string) =>
+      value.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+    const tokenize = (value: string) =>
+      normalizeToken(value)
+        .split(" ")
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 3);
+    const overlapCount = (a: string, b: string) => {
+      const aSet = new Set(tokenize(a));
+      let count = 0;
+      for (const token of tokenize(b)) {
+        if (aSet.has(token)) count += 1;
+      }
+      return count;
+    };
+    const sourceLines = extractedText
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    const looksLikeDateLine = (line: string) =>
+      /\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|SEPT|OCT|NOV|DEC|PRESENT|DATE|TILL|TO|UNTIL|CURRENT|20\d{2})\b/i.test(
+        line
+      );
+    const isLikelyCompanyLine = (line: string) => {
+      const clean = line.replace(/\s+/g, " ").trim();
+      if (!clean || clean.length < 3 || clean.length > 90) return false;
+      if (looksLikeDateLine(clean)) return false;
+      if (/^[\u2022\-*]/.test(clean)) return false;
+      if (/\b(HOD|FACILITATOR|TEACHER|TRAINER|MANAGER|ENGINEER|DEVELOPER|LEAD|INTERN)\b/i.test(clean)) {
+        return false;
+      }
+      return /[A-Za-z]/.test(clean) && /[A-Z]/.test(clean);
+    };
+    const inferCompanyFromSource = (role: string, dates: string) => {
+      if (!sourceLines.length) return "";
+      const normalizedRole = normalizeToken(role);
+      const normalizedDates = normalizeToken(dates);
+      let anchorIndex = -1;
+      if (normalizedDates) {
+        anchorIndex = sourceLines.findIndex((line) =>
+          normalizeToken(line).includes(normalizedDates)
+        );
+      }
+      if (anchorIndex === -1 && normalizedRole) {
+        anchorIndex = sourceLines.findIndex((line) =>
+          normalizeToken(line).includes(normalizedRole)
+        );
+      }
+      if (anchorIndex === -1) anchorIndex = 0;
+      const start = Math.max(0, anchorIndex - 3);
+      const end = Math.min(sourceLines.length - 1, anchorIndex + 2);
+      for (let i = start; i <= end; i += 1) {
+        const line = sourceLines[i];
+        if (line.includes(":")) {
+          const afterColon = line.split(":").slice(1).join(":").trim();
+          if (isLikelyCompanyLine(afterColon)) return afterColon;
+        }
+      }
+      for (let i = start; i <= end; i += 1) {
+        const line = sourceLines[i];
+        if (isLikelyCompanyLine(line)) return line;
+      }
+      return "";
+    };
+    const resolveCompany = (company: string, role: string, dates: string) => {
+      const current = safeString(company);
+      if (!current) return current;
+      const inferred = inferCompanyFromSource(role, dates);
+      if (!inferred) return current;
+      if (normalizeToken(current) === normalizeToken(inferred)) return current;
+      const matchesInferred =
+        normalizeToken(current).includes(normalizeToken(inferred)) ||
+        overlapCount(current, inferred) >= Math.min(2, tokenize(inferred).length);
+      return matchesInferred ? inferred : current;
+    };
 
     const skills = safeArray(parsed.skills).map((skill: any) =>
       typeof skill === "string"
         ? { name: skill, rating: 3 }
         : {
-            name: safeString(skill?.name),
-            rating: Math.max(1, Math.min(5, Number(skill?.rating ?? 3))),
-          }
+          name: safeString(skill?.name),
+          rating: Math.max(1, Math.min(5, Number(skill?.rating ?? 3))),
+        }
     );
 
     const experiences = safeArray(parsed.experiences)
-      .map((exp: any) => ({
-        role: safeString(exp?.role),
-        company: safeString(exp?.company),
-        dates: safeString(exp?.dates),
-        bullets: safeArray(exp?.bullets).map((bullet) => safeString(bullet)).filter(Boolean),
-      }))
+      .map((exp: any) => {
+        const role = safeString(exp?.role);
+        const dates = safeString(exp?.dates);
+        return {
+          role,
+          company: resolveCompany(safeString(exp?.company), role, dates),
+          dates,
+        bullets: safeArray(exp?.bullets)
+          .map((bullet) => safeString(bullet))
+          .filter(Boolean)
+          .slice(0, 3),
+        };
+      })
       .filter((exp) => exp.role || exp.company || exp.dates || exp.bullets.length);
 
     const education = safeArray(parsed.education)
@@ -960,6 +1053,47 @@ export default function ResumeBuilder() {
     return hasCore ? normalized : null;
   };
 
+  const compressInstitutionName = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return "";
+    if (trimmed.length <= 28) return trimmed;
+
+    const stopwords = new Set([
+      "of",
+      "and",
+      "the",
+      "for",
+      "in",
+      "on",
+      "at",
+      "by",
+      "to",
+      "a",
+      "an",
+    ]);
+
+    const words = trimmed.split(/[^A-Za-z0-9]+/).filter(Boolean);
+    const parts = words.filter((word) => !stopwords.has(word.toLowerCase()));
+    if (!parts.length) return trimmed;
+
+    const acronym = parts
+      .map((word) => {
+        const upper = word.toUpperCase();
+        if (word === upper && word.length <= 5) return upper;
+        return upper[0];
+      })
+      .join("");
+
+    return acronym.length >= 3 ? acronym : trimmed;
+  };
+
+  const formatEducationMeta = (school: string, dates: string) => {
+    const schoolText = compressInstitutionName(school);
+    const dateText = dates.trim();
+    if (schoolText && dateText) return `${schoolText} | ${dateText}`;
+    return schoolText || dateText;
+  };
+
   const templateOptions = [
     {
       id: "navy",
@@ -991,6 +1125,9 @@ export default function ResumeBuilder() {
 
   const renderNavyTemplate = () => {
     const photoSrc = resolvePhotoSrc(form.photo);
+    const hasPhoto =
+      (typeof form.photo === "string" && form.photo.trim().length > 0) ||
+      (typeof form.photo !== "string" && !!form.photo);
     return (
       <div
         ref={previewRef}
@@ -999,50 +1136,13 @@ export default function ResumeBuilder() {
         style={{ "--navy-sidebar-color": form.sidebarColor || "#0b2942" } as React.CSSProperties}
       >
         <div className={styles.navySidebar} data-resume-sidebar>
-          <div
-            className={styles.photoCircle}
-            role="button"
-            tabIndex={0}
-            onClick={() => photoInputRef.current?.click()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                photoInputRef.current?.click();
-              }
-            }}
-            aria-label="Upload profile photo"
-          >
-            <Image src={photoSrc} alt="Profile" width={120} height={120} />
-            <span className={styles.photoCamera} aria-hidden="true">
-              📷
-            </span>
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              className={styles.photoInput}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handlePhotoUpload(file);
-              }}
-            />
-          </div>
-          <div className={styles.sidebarBlock}>
-            <h4>CONTACT</h4>
-            <ul>
-              <li>{form.phone}</li>
-              <li>{form.email}</li>
-              <li>{form.location}</li>
-            </ul>
-          </div>
           <div className={styles.sidebarBlock}>
             <h4>EDUCATION</h4>
             <ul>
               {form.education.map((edu, idx) => (
                 <li key={idx}>
-                  <div className={styles.bold}>{edu.school}</div>
-                  <div>{edu.degree}</div>
-                  <div>{edu.dates}</div>
+                  <div className={styles.bold}>{edu.degree}</div>
+                  <div>{formatEducationMeta(edu.school, edu.dates)}</div>
                 </li>
               ))}
             </ul>
@@ -1066,52 +1166,92 @@ export default function ResumeBuilder() {
               ))}
             </ul>
           </div>
-        </div>
-
-        <div className={styles.navyMain} data-resume-main>
-          <div className={styles.navyHeaderText} data-page-block>
-            <div className={styles.resumeName}>{form.name}</div>
-            <div className={styles.resumeTitle}>{form.title}</div>
-          </div>
-
-          <div className={styles.resumeSection} data-page-block>
-            <h4>PROFILE</h4>
-            <div className={styles.resumeList} style={{ listStyle: "none", paddingLeft: 0 }}>
-              <div>{form.summary}</div>
-            </div>
-          </div>
-
-          <div className={styles.resumeSection} data-page-block>
-            <h4>WORK EXPERIENCE</h4>
-            <ul className={styles.resumeList}>
-              {form.experiences.map((exp, idx) => (
-                <li key={idx} data-page-block>
-                  <div className={styles.resumeItemTitle}>{exp.company}</div>
-                  <div className={styles.resumeTitleSmall}>{exp.role}</div>
-                  <div className={styles.resumeMeta}>{exp.dates}</div>
-                  <ul className={styles.resumeList}>
-                    {exp.bullets.map((b, i) => (
-                      <li key={i}>{b}</li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          </div>
           {form.certifications.length > 0 && (
-            <div
-              className={styles.resumeSection}
-              data-page-block
-              data-section="certifications"
-            >
+            <div className={styles.sidebarBlock}>
               <h4>CERTIFICATIONS</h4>
-              <ul className={styles.resumeList}>
+              <ul>
                 {form.certifications.map((cert, idx) => (
                   <li key={idx}>{cert}</li>
                 ))}
               </ul>
             </div>
           )}
+        </div>
+
+        <div className={styles.navyMain} data-resume-main>
+          <div className={styles.navyHeader} data-page-block>
+            <div className={styles.navyHeaderText}>
+              {hasPhoto ? (
+                <div
+                  className={styles.photoCircle}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => photoInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      photoInputRef.current?.click();
+                    }
+                  }}
+                  aria-label="Upload profile photo"
+                >
+                  <Image src={photoSrc} alt="Profile" width={120} height={120} />
+                  <span className={styles.photoCamera} aria-hidden="true">
+                    📷
+                  </span>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className={styles.photoInput}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePhotoUpload(file);
+                    }}
+                  />
+                </div>
+              ) : null}
+              <div className={styles.personalDetails}>
+                <div className={styles.resumeName}>{form.name}</div>
+                <div className={styles.resumeTitle}>{form.title}</div>
+              </div>
+            </div>
+            <div className={styles.navyRightPanel}>
+              <ul className={styles.navyContactList}>
+                <li>{form.phone}</li>
+                <li>{form.email}</li>
+                <li>{form.location}</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className={styles.resumeSection} data-page-block>
+            <h4>PROFESSIONAL SUMMARY</h4>
+            <div>
+              <div>{form.summary}</div>
+            </div>
+          </div>
+
+          <div className={styles.resumeSection} data-page-block>
+            <h4>WORK EXPERIENCE</h4>
+            <div>
+              {form.experiences.map((exp, idx) => (
+                <>
+                <div className={styles.resumeItemTitle}>
+                  {exp.role}
+                  <div className={styles.resumeMeta}>{exp.dates}</div>
+                </div>
+                <div className={styles.resumeTitleSmall}>{exp.company}</div>
+                <div key={idx} data-page-block>
+                    <ul className={styles.resumeList}>
+                      {exp.bullets.map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                  </div></>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -1123,10 +1263,10 @@ export default function ResumeBuilder() {
       <div ref={previewRef} className={styles.cleanWrapper}>
         <div className={styles.cleanHeader}>
           <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-              <div>
-                <div className={styles.cleanName}>{form.name}</div>
-                <div className={styles.cleanTitle}>{form.title}</div>
-              </div>
+            <div>
+              <div className={styles.cleanName}>{form.name}</div>
+              <div className={styles.cleanTitle}>{form.title}</div>
+            </div>
           </div>
           <div className={`${styles.cleanMeta} ${styles.personalMeta}`}>
             <span>✉ {form.email}</span>
@@ -1174,9 +1314,10 @@ export default function ResumeBuilder() {
               <h4>Education</h4>
               {form.education.map((edu, idx) => (
                 <div key={idx} className={styles.cleanItem}>
-                  <div className={styles.cleanItemTitle}>{edu.school}</div>
-                  <div>{edu.degree}</div>
-                  <div className={styles.cleanItemMeta}>{edu.dates}</div>
+                  <div className={styles.cleanItemTitle}>{edu.degree}</div>
+                  <div className={styles.cleanItemMeta}>
+                    {formatEducationMeta(edu.school, edu.dates)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1260,9 +1401,10 @@ export default function ResumeBuilder() {
               <h4>Education</h4>
               {form.education.map((edu, idx) => (
                 <div key={idx} className={styles.slateItem}>
-                  <div className={styles.slateItemTitle}>{edu.school}</div>
-                  <div className={styles.slateItemMeta}>{edu.degree}</div>
-                  <div className={styles.slateItemMeta}>{edu.dates}</div>
+                  <div className={styles.slateItemTitle}>{edu.degree}</div>
+                  <div className={styles.slateItemMeta}>
+                    {formatEducationMeta(edu.school, edu.dates)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1290,8 +1432,8 @@ export default function ResumeBuilder() {
     );
   };
 
-    return (
-      <Layout>
+  return (
+    <Layout>
       <>
         <div className={`${styles.header} ${styles.noPrint}`}>
           <div>
@@ -1357,29 +1499,29 @@ export default function ResumeBuilder() {
                   </div>
                   <div className="form-group">
                     <div className={styles.uploadRow}>
-                        <label className={styles.fileButton}>
-                          📄 Upload your resume here
-                          <input
-                            type="file"
-                            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            className={styles.fileInputHidden}
-                            required
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                setUploadFileName(file.name);
-                                handleFileUpload(file);
-                              }
-                            }}
-                          />
-                        </label>
-                        <span className={styles.fileName}>
-                          {uploadFileName || "No file selected"}
-                        </span>
-                      </div>
-                      {isExtracting && <p className={styles.uploadStatus}>Extracting text...</p>}
-                      {uploadError && <p className={styles.uploadError}>{uploadError}</p>}
+                      <label className={styles.fileButton}>
+                        📄 Upload your resume here
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          className={styles.fileInputHidden}
+                          required
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setUploadFileName(file.name);
+                              handleFileUpload(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      <span className={styles.fileName}>
+                        {uploadFileName || "No file selected"}
+                      </span>
                     </div>
+                    {isExtracting && <p className={styles.uploadStatus}>Extracting text...</p>}
+                    {uploadError && <p className={styles.uploadError}>{uploadError}</p>}
+                  </div>
                   <div className="form-group">
                     <button
                       type="submit"
@@ -1401,8 +1543,8 @@ export default function ResumeBuilder() {
 
                 {aiResult && (
                   <>
-                  <h2 className={styles.aiResumeTitle}>AI Feedback based on target role</h2>
-                  <div ref={aiResultRef} className={styles.aiCard}>
+                    <h2 className={styles.aiResumeTitle}>AI Feedback based on target role</h2>
+                    <div ref={aiResultRef} className={styles.aiCard}>
                       <div className={styles.aiHeader}>
                         <h3 className={styles.sectionTitle}>✨ AI Resume Review</h3>
                         <span className={styles.aiScore}>⭐ {aiResult.score}/100</span>
@@ -1562,9 +1704,8 @@ export default function ResumeBuilder() {
                 </details>
 
                 <details
-                  className={`${styles.accordion} ${
-                    missingRequiredSections.includes("skills") ? styles.accordionError : ""
-                  }`}
+                  className={`${styles.accordion} ${missingRequiredSections.includes("skills") ? styles.accordionError : ""
+                    }`}
                 >
                   <summary className={styles.accordionHeader}>Skills</summary>
                   <div className={styles.accordionBody}>
@@ -1627,11 +1768,10 @@ export default function ResumeBuilder() {
                 </details>
 
                 <details
-                  className={`${styles.accordion} ${
-                    missingRequiredSections.includes("languages")
+                  className={`${styles.accordion} ${missingRequiredSections.includes("languages")
                       ? styles.accordionError
                       : ""
-                  }`}
+                    }`}
                 >
                   <summary className={styles.accordionHeader}>Languages</summary>
                   <div className={styles.accordionBody}>
@@ -1709,11 +1849,10 @@ export default function ResumeBuilder() {
                 </details>
 
                 <details
-                  className={`${styles.accordion} ${
-                    missingRequiredSections.includes("experience")
+                  className={`${styles.accordion} ${missingRequiredSections.includes("experience")
                       ? styles.accordionError
                       : ""
-                  }`}
+                    }`}
                 >
                   <summary className={styles.accordionHeader}>Experience</summary>
                   <div className={styles.accordionBody}>
@@ -1777,11 +1916,10 @@ export default function ResumeBuilder() {
                 </details>
 
                 <details
-                  className={`${styles.accordion} ${
-                    missingRequiredSections.includes("education")
+                  className={`${styles.accordion} ${missingRequiredSections.includes("education")
                       ? styles.accordionError
                       : ""
-                  }`}
+                    }`}
                 >
                   <summary className={styles.accordionHeader}>Education</summary>
                   <div className={styles.accordionBody}>
@@ -1833,37 +1971,37 @@ export default function ResumeBuilder() {
                     </div>
                   </div>
                 </details>
-        {missingRequiredSections.length > 0 && (
-          <div className={`${styles.missingNotice} ${styles.noPrint}`}>
-            <span>Missing required sections before save & download:</span>
-            <ul>
-              {missingRequiredSections.map((section) => (
-                <li key={section}>{section}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className={`${styles.downloadActions} ${styles.noPrint}`}>
-          <button
-            type="button"
-            className={`btn-primary ${styles.tabButton}`}
-            onClick={() => {
-              scrollToPreviewHeader();
-            }}
-          >
-            Review Resume
-          </button>
-          <button
-            type="button"
-            className={`btn-primary ${styles.downloadResume}`}
-            title="Save and Download PDF"
-            onClick={saveDownloadResume}
-            disabled={isSaving}
-            aria-busy={isSaving}
-          >
-            {isSaving ? "Saving..." : "Save and Download"}
-          </button>
-        </div>
+                {missingRequiredSections.length > 0 && (
+                  <div className={`${styles.missingNotice} ${styles.noPrint}`}>
+                    <span>Missing required sections before save & download:</span>
+                    <ul>
+                      {missingRequiredSections.map((section) => (
+                        <li key={section}>{section}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className={`${styles.downloadActions} ${styles.noPrint}`}>
+                  <button
+                    type="button"
+                    className={`btn-primary ${styles.tabButton}`}
+                    onClick={() => {
+                      scrollToPreviewHeader();
+                    }}
+                  >
+                    Review Resume
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-primary ${styles.downloadResume}`}
+                    title="Save and Download PDF"
+                    onClick={saveDownloadResume}
+                    disabled={isSaving}
+                    aria-busy={isSaving}
+                  >
+                    {isSaving ? "Saving..." : "Save and Download"}
+                  </button>
+                </div>
 
               </>
             )}
