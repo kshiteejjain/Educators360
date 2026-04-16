@@ -1015,7 +1015,107 @@ export default function ResumeBuilder() {
       .map((lang) => safeString(lang))
       .filter(Boolean);
 
-    const certifications = safeArray(parsed.certifications)
+    const dedupeValues = (items: string[]) => {
+      const seen = new Set<string>();
+      const unique: string[] = [];
+      for (const item of items) {
+        const key = item.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(item);
+      }
+      return unique;
+    };
+
+    const cleanCertification = (value: string) =>
+      value
+        .replace(/^[\s\-*•\u2022]+/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const certificationKeywords =
+      /\b(certification|certificate|certified|license|licensed|credential|accreditation|diploma)\b/i;
+
+    const scoreCertification = (certification: string) => {
+      let score = 0;
+      const normalized = certification.toLowerCase();
+      const roleContext = `${safeString(parsed.title)} ${targetJob.trim()}`.toLowerCase();
+      const skillContext = skills.map((skill) => skill.name.toLowerCase()).join(" ");
+
+      if (/\b(license|licensed)\b/.test(normalized)) score += 8;
+      if (/\b(certification|certificate|certified|credential)\b/.test(normalized)) score += 6;
+      if (/\b(level|professional|advanced|specialist)\b/.test(normalized)) score += 3;
+      if (roleContext && overlapCount(roleContext, normalized) > 0) score += 4;
+      if (skillContext && overlapCount(skillContext, normalized) > 0) score += 3;
+
+      const yearMatch = normalized.match(/\b(19|20)\d{2}\b/g);
+      if (yearMatch?.length) {
+        const latestYear = Math.max(...yearMatch.map((year) => Number(year)));
+        score += Math.max(0, latestYear - 2000);
+      }
+      return score;
+    };
+
+    const extractCertificationsFromSource = () => {
+      const extracted: string[] = [];
+      const headingIndex = sourceLines.findIndex((line) =>
+        /\bcertifications?\b/i.test(line)
+      );
+
+      if (headingIndex >= 0) {
+        for (let i = headingIndex + 1; i < sourceLines.length && i <= headingIndex + 8; i += 1) {
+          const line = sourceLines[i];
+          if (!line) continue;
+          if (/^[A-Z][A-Z\s&/]{3,}$/.test(line) && !certificationKeywords.test(line)) break;
+          extracted.push(cleanCertification(line));
+        }
+      }
+
+      sourceLines.forEach((line) => {
+        if (!certificationKeywords.test(line)) return;
+        const afterColon = line.includes(":") ? line.split(":").slice(1).join(":") : line;
+        const segments = afterColon.split(/[|;]/).map((segment) => cleanCertification(segment));
+        segments.forEach((segment) => {
+          if (segment) extracted.push(segment);
+        });
+      });
+
+      return dedupeValues(extracted.filter(Boolean));
+    };
+
+    const buildFallbackCertifications = () => {
+      const fallback: string[] = [];
+      const role = safeString(parsed.title) || targetJob.trim();
+      const roleContext = `${role} ${education.map((edu) => edu.degree).join(" ")}`.toLowerCase();
+
+      if (role) fallback.push(`${role} Professional Certification`);
+      skills
+        .map((skill) => safeString(skill.name))
+        .filter(Boolean)
+        .slice(0, 4)
+        .forEach((skill) => fallback.push(`Certification in ${skill}`));
+
+      if (/(teacher|educator|school|curriculum|classroom|education)/i.test(roleContext)) {
+        fallback.push("State Teaching License");
+        fallback.push("TESOL / TEFL Certification");
+        fallback.push("Google Certified Educator Level 1");
+      }
+
+      if (/(developer|engineer|software|data|analytics|cloud|ai)/i.test(roleContext)) {
+        fallback.push("Professional Certificate in Applied AI");
+        fallback.push("Cloud Practitioner Certification");
+      }
+
+      if (!fallback.length) {
+        fallback.push("Professional Role-Based Certification");
+        fallback.push("Industry Skills Certification");
+        fallback.push("Advanced Practice Certification");
+      }
+
+      return dedupeValues(fallback.map(cleanCertification).filter(Boolean));
+    };
+
+    const parsedCertifications = safeArray(parsed.certifications)
       .map((cert: any) => {
         if (typeof cert === "string") return safeString(cert);
         if (cert && typeof cert === "object") {
@@ -1023,7 +1123,22 @@ export default function ResumeBuilder() {
         }
         return "";
       })
+      .map(cleanCertification)
       .filter(Boolean);
+
+    const sourceCertifications = extractCertificationsFromSource();
+    const rankedCertifications = dedupeValues([
+      ...parsedCertifications,
+      ...sourceCertifications,
+    ])
+      .sort((a, b) => scoreCertification(b) - scoreCertification(a))
+      .slice(0, 5);
+
+    const fallbackCertifications = buildFallbackCertifications();
+    const certifications =
+      rankedCertifications.length >= 3
+        ? rankedCertifications
+        : dedupeValues([...rankedCertifications, ...fallbackCertifications]).slice(0, 5);
 
     const normalized: ResumeTemplate = {
       ...emptyState(templates[0]),
@@ -1123,6 +1238,10 @@ export default function ResumeBuilder() {
     return photo ?? placeholderTeacher;
   };
 
+  const hasPhotoValue =
+    (typeof form.photo === "string" && form.photo.trim().length > 0) ||
+    (typeof form.photo !== "string" && !!form.photo);
+
   const renderNavyTemplate = () => {
     const photoSrc = resolvePhotoSrc(form.photo);
     const hasPhoto =
@@ -1167,7 +1286,7 @@ export default function ResumeBuilder() {
             </ul>
           </div>
           {form.certifications.length > 0 && (
-            <div className={styles.sidebarBlock}>
+            <div className={`${styles.sidebarBlock} ${styles.certificationsList}`}>
               <h4>CERTIFICATIONS</h4>
               <ul>
                 {form.certifications.map((cert, idx) => (
@@ -1196,6 +1315,21 @@ export default function ResumeBuilder() {
                   aria-label="Upload profile photo"
                 >
                   <Image src={photoSrc} alt="Profile" width={120} height={120} />
+                  <button
+                    type="button"
+                    className={styles.photoDelete}
+                    aria-label="Delete profile photo"
+                    title="Delete photo"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateField("photo", "");
+                    }}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    🗑️
+                  </button>
                   <span className={styles.photoCamera} aria-hidden="true">
                     📷
                   </span>
@@ -1668,12 +1802,28 @@ export default function ResumeBuilder() {
                       </div>
                       <div className="form-group">
                         <label >Photo URL (optional)</label>
-                        <input
-                          className="form-control"
-                          value={typeof form.photo === "string" ? form.photo : ""}
-                          placeholder="https://example.com/photo.jpg"
-                          onChange={(e) => updateField("photo", e.target.value)}
-                        />
+                        <div style={{ position: "relative" }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <input
+                              className="form-control"
+                              value={typeof form.photo === "string" ? form.photo : ""}
+                              placeholder="https://example.com/photo.jpg"
+                              onChange={(e) => updateField("photo", e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={() => {
+                                updateField("photo", "");
+                              }}
+                              disabled={!hasPhotoValue}
+                              aria-label="Delete current photo"
+                              title="Delete current photo"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
                         <input
                           type="file"
                           accept="image/*"
@@ -1813,6 +1963,10 @@ export default function ResumeBuilder() {
                   <div className={styles.accordionBody}>
                     <div className="form-group">
                       <label>Certifications</label>
+                      <div style={{ fontSize: "12px", color: "#5b6472", marginBottom: "8px" }}>
+                        Add 3 to 5 certifications. They are shown as bullet points in preview.
+                        If more than 5 are provided, only the top 5 most relevant are kept.
+                      </div>
                       <div className={styles.skillsRow}>
                         <input
                           className="form-control"

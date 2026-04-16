@@ -967,6 +967,10 @@
   position: relative;
 }
 
+.certificationsList ul{
+  list-style: disc;
+}
+
 .navyWrapper {
   --navy-sidebar-width: 240px;
   --navy-sidebar-color: #0b2942;
@@ -1032,6 +1036,12 @@
 
 .navySidebar ul li {
   color: var(--color-gray);
+}
+
+.navySidebar .certificationsList ul {
+  list-style: disc;
+  padding-left: 18px;
+  margin: 0;
 }
 
 .sidebarColorPicker {
@@ -1152,8 +1162,39 @@
   pointer-events: none;
 }
 
+.photoDelete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #8b1d1d;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 3;
+  transform: scale(0.95);
+}
+
+.photoDelete:hover,
+.photoDelete:focus-visible {
+  transform: scale(1);
+}
+
 .photoCircle:hover::after,
 .photoCircle:hover .photoCamera {
+  opacity: 1;
+}
+
+.photoCircle:hover .photoDelete {
   opacity: 1;
 }
 
@@ -1162,11 +1203,23 @@
   opacity: 1;
 }
 
+.photoCircle:focus-visible .photoDelete {
+  opacity: 1;
+}
+
+.photoCircle:focus-within::after,
+.photoCircle:focus-within .photoCamera,
+.photoCircle:focus-within .photoDelete {
+  opacity: 1;
+}
+
 .sidebarBlock {
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding-bottom: 10px;
 }
-
+.sidebarBlock:last-child {
+  border-bottom: none;
+}
 .bold {
   font-weight: 600;
 }
