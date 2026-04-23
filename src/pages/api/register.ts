@@ -57,7 +57,7 @@ export default async function handler(
 
   try {
     const db = getDb();
-    const userRef = doc(db, "upEducatePlusUsers", normalizedEmail);
+    const userRef = doc(db, "Educators360Users", normalizedEmail);
     const existingUser = await getDoc(userRef);
 
     if (existingUser.exists()) {
@@ -87,3 +87,4 @@ export default async function handler(
     return res.status(500).json({ message });
   }
 }
+

@@ -167,7 +167,7 @@ export default function Register() {
       {/* Left Section (Same visual as login) */}
       <div className={styles.leftSection}>
         <div className="overlay">
-          <h1 className={styles.brand}>upEducatePlus</h1>
+          <h1 className={styles.brand}>Educators360</h1>
           <p className={styles.tagline}>
             Join our vibrant learning community and unlock your potential.
           </p>
@@ -179,7 +179,7 @@ export default function Register() {
         <div className={styles.formContainer}>
           <h2 className={styles.heading}>Create Your Account</h2>
           <p className={styles.subHeading}>
-            Register to start your journey with upEducatePlus
+            Register to start your journey with Educators360
           </p>
 
           <form onSubmit={handleSubmit}>

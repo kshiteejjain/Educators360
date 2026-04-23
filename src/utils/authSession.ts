@@ -5,7 +5,7 @@ export type AuthUser = {
   userId?: string;
 };
 
-const STORAGE_KEY = "upeducateJobPrefix";
+const STORAGE_KEY = "educators360JobPrefix";
 
 function isBrowser() {
   return typeof window !== "undefined";
@@ -34,3 +34,4 @@ export function getSession(): AuthUser | null {
     return null;
   }
 }
+

@@ -34,10 +34,10 @@ export default function App({ Component, pageProps }: AppProps) {
     <>
       <Head>
         {/* 🌐 Basic Meta */}
-        <title>upEducatePlus | AI Job Search | AI Interview</title>
+        <title>Educators360 | AI Job Search | AI Interview</title>
         <meta
           name="description"
-          content="upEducatePlus empowers students and educators through innovative learning experiences."
+          content="Educators360 empowers students and educators through innovative learning experiences."
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
 

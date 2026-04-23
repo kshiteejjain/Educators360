@@ -374,7 +374,7 @@ export default function JobDetailsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const rawProfile = window.localStorage.getItem("upeducateJobPrefix");
+      const rawProfile = window.localStorage.getItem("educators360JobPrefix");
       if (!rawProfile) return;
       const parsed = JSON.parse(rawProfile) as Record<string, unknown>;
       const extracted = extractProfileData(parsed);
@@ -651,3 +651,4 @@ export default function JobDetailsPage() {
     </Layout>
   );
 }
+

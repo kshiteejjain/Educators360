@@ -115,6 +115,44 @@ const buildSkillsRewrite = (targetRole: string) =>
 const buildProfileText = (parts: string[]) =>
   parts.map((part) => part.trim()).filter(Boolean).join("\n");
 
+class LinkedInFetchError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "LinkedInFetchError";
+    this.status = status;
+  }
+}
+
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const isRetryableStatus = (status: number) =>
+  [408, 425, 429, 500, 502, 503, 504].includes(status);
+
+const sanitizeRapidApiError = (error: unknown) => {
+  if (!(error instanceof LinkedInFetchError)) {
+    return "Failed to fetch LinkedIn profile. Please try again.";
+  }
+
+  if (isRetryableStatus(error.status)) {
+    return "LinkedIn data provider is temporarily busy. Please try again in a few minutes, or use the 'No LinkedIn Profile Yet' option.";
+  }
+
+  if (error.status === 401 || error.status === 403) {
+    return "LinkedIn data provider authorization failed. Please contact support.";
+  }
+
+  if (error.status === 404) {
+    return "LinkedIn profile not found. Please verify the profile URL and try again.";
+  }
+
+  return "Failed to fetch LinkedIn profile. Please check the URL and try again.";
+};
+
 const fetchLinkedInProfile = async (linkedinUrl: string) => {
   const apiKey = process.env.RAPIDAPI_KEY ?? process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
   const apiHost =
@@ -140,34 +178,57 @@ const fetchLinkedInProfile = async (linkedinUrl: string) => {
   url.searchParams.set("include_profile_status", "false");
   url.searchParams.set("include_company_public_url", "false");
 
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      "x-rapidapi-key": apiKey,
-      "x-rapidapi-host": apiHost,
-    },
-  });
+  const headers = {
+    "x-rapidapi-key": apiKey,
+    "x-rapidapi-host": apiHost,
+  };
+  const maxAttempts = 3;
+  let lastStatus = 500;
+  let lastMessage = "Unknown upstream error";
 
-  if (!response.ok) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers,
+    });
+
+    if (response.ok) {
+      return (await response.json()) as Record<string, unknown>;
+    }
+
+    const responseText = await response.text();
+    lastStatus = response.status;
+    lastMessage = responseText;
+
     const fallbackUrl = new URL(`https://${apiHost}/get-company-by-linkedinurl`);
     fallbackUrl.searchParams.set("linkedin_url", linkedinUrl);
     const fallbackResponse = await fetch(fallbackUrl.toString(), {
       method: "GET",
-      headers: {
-        "x-rapidapi-key": apiKey,
-        "x-rapidapi-host": apiHost,
-      },
+      headers,
     });
 
-    if (!fallbackResponse.ok) {
-      const errText = await response.text();
-      throw new Error(`RapidAPI error: ${response.status} - ${errText}`);
+    if (fallbackResponse.ok) {
+      return (await fallbackResponse.json()) as Record<string, unknown>;
     }
 
-    return (await fallbackResponse.json()) as Record<string, unknown>;
+    const fallbackText = await fallbackResponse.text();
+    if (isRetryableStatus(fallbackResponse.status)) {
+      lastStatus = fallbackResponse.status;
+      lastMessage = fallbackText;
+    }
+
+    if (
+      attempt < maxAttempts &&
+      (isRetryableStatus(response.status) || isRetryableStatus(fallbackResponse.status))
+    ) {
+      await sleep(350 * attempt);
+      continue;
+    }
+
+    throw new LinkedInFetchError(lastStatus, lastMessage);
   }
 
-  return (await response.json()) as Record<string, unknown>;
+  throw new LinkedInFetchError(lastStatus, lastMessage);
 };
 
 const mapLinkedInToProfileInput = (data: Record<string, unknown>): ProfileInput => {
@@ -466,8 +527,7 @@ export default async function handler(
       skills = splitKeywords(mapped.skills);
       fetchedFromLinkedIn = true;
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to fetch LinkedIn profile.";
+      const message = sanitizeRapidApiError(error);
       return res.status(500).json({ message });
     }
   }

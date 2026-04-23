@@ -68,7 +68,7 @@ export default function Login() {
               userId: authenticatedUser?.userId,
               targetRole: authenticatedUser?.targetRole,
             };
-            window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(payload));
+            window.localStorage.setItem("educators360JobPrefix", JSON.stringify(payload));
           } catch (err) {
             console.warn("Failed to store user job profile", err);
           }
@@ -155,7 +155,7 @@ export default function Login() {
           </form>
 
           <div className={styles.divider}>
-            <span>New to upEducatePlus?</span>
+            <span>New to Educators360?</span>
           </div>
 
           <button
@@ -182,3 +182,4 @@ export default function Login() {
     </div>
   );
 }
+

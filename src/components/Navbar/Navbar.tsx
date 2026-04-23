@@ -44,7 +44,7 @@ export default function Navbar() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem("upeducateJobPrefix");
+      const raw = window.localStorage.getItem("educators360JobPrefix");
       if (!raw) return;
       const parsed = JSON.parse(raw) as StoredUser;
       setStoredUser(parsed ?? null);
@@ -130,3 +130,4 @@ export default function Navbar() {
     </header>
   );
 }
+

@@ -89,7 +89,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   const db = getDb();
-  const projectsRef = collection(db, "upEducatePlus");
+  const projectsRef = collection(db, "Educators360");
   const projectId =
     typeof req.query.id === "string"
       ? req.query.id
@@ -334,3 +334,4 @@ export default async function handler(
   res.setHeader("Allow", "GET, POST, PATCH, DELETE");
   return res.status(405).json({ message: "Method Not Allowed" });
 }
+

@@ -27,7 +27,7 @@ export default async function handler(
 
   try {
     const db = getDb();
-    const userRef = doc(db, "upEducatePlusUsers", normalizedEmail);
+    const userRef = doc(db, "Educators360Users", normalizedEmail);
     const userSnap = await getDoc(userRef);
 
     if (!userSnap.exists()) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import Layout from "@/components/Layout/Layout";
 import Loader from "@/components/Loader/Loader";
@@ -17,6 +17,15 @@ type InterviewQuestion = {
   category: string;
 };
 
+type StoredProfile = {
+  resume?: Record<string, unknown>;
+};
+
+type BrowserWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognition;
+  webkitSpeechRecognition?: new () => SpeechRecognition;
+};
+
 type InterviewReport = {
   score: number;
   confidence: string;
@@ -31,6 +40,11 @@ type InterviewReport = {
   suggestions?: string[];
   feedback?: string[];
   overallFeedback?: string;
+  questionFeedback?: Array<{
+    questionId: string;
+    question: string;
+    feedback: string;
+  }>;
 };
 
 const SUBJECTIVE_QUESTIONS: InterviewQuestion[] = [
@@ -86,6 +100,9 @@ const SUBJECTIVE_QUESTIONS: InterviewQuestion[] = [
   },
 ];
 
+const MAX_QUESTIONS = SUBJECTIVE_QUESTIONS.length;
+const JOB_PREFIX_STORAGE_KEY = "educators360JobPrefix";
+
 export default function AIInterview() {
   const [view, setView] = useState<ViewMode>("configure");
   const [contextPrompt, setContextPrompt] = useState("");
@@ -102,14 +119,20 @@ export default function AIInterview() {
   const [reportLoading, setReportLoading] = useState(false);
   const [questionLoading, setQuestionLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [resumeData, setResumeData] = useState<Record<string, unknown> | null>(null);
+  const [resumePayload, setResumePayload] = useState<Record<string, unknown> | null>(null);
+  const [readAloudSupported, setReadAloudSupported] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [autoReadAloud, setAutoReadAloud] = useState(true);
   const scoreChartRef = useRef<Chart<"doughnut", number[], string> | null>(null);
   const completionChartRef = useRef<Chart<"doughnut", number[], string> | null>(null);
   const scoreCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const completionCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recordingQuestionIdRef = useRef<string | null>(null);
   const pendingRecordingStartRef = useRef<string | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const conversationRef = useRef<OpenAIMessage[]>([]);
 
@@ -129,17 +152,53 @@ export default function AIInterview() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(JOB_PREFIX_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as StoredProfile;
+      const resume =
+        parsed?.resume && typeof parsed.resume === "object" ? parsed.resume : null;
+      const data =
+        resume &&
+        typeof (resume as Record<string, unknown>).data === "object" &&
+        (resume as Record<string, unknown>).data !== null
+          ? ((resume as Record<string, unknown>).data as Record<string, unknown>)
+          : null;
+      if (!data) return;
+      setResumeData(data);
+      setResumePayload({
+        ...(resume as Record<string, unknown>),
+        data: {
+          ...data,
+          resumeData: data,
+        },
+      });
+    } catch (error) {
+      console.warn("Failed to read local profile from storage", error);
+    }
+  }, []);
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const supported =
+      "speechSynthesis" in window && typeof window.SpeechSynthesisUtterance !== "undefined";
+    setReadAloudSupported(supported);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const browserWindow = window as BrowserWindow;
+    const SpeechRecognitionCtor =
+      browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) {
       setSpeechSupported(false);
       return;
     }
 
     setSpeechSupported(true);
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionCtor();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
@@ -154,7 +213,7 @@ export default function AIInterview() {
       }, 5000);
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       resetSilenceTimer();
       const questionId = recordingQuestionIdRef.current;
       if (!questionId) return;
@@ -179,7 +238,7 @@ export default function AIInterview() {
       });
     };
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       setSpeechError(
         event?.error
           ? `Speech recognition error: ${event.error}`
@@ -203,7 +262,7 @@ export default function AIInterview() {
         try {
           recognition.start();
           resetSilenceTimer();
-        } catch (err) {
+        } catch {
           setSpeechError("Unable to start speech recording.");
         }
         return;
@@ -226,6 +285,69 @@ export default function AIInterview() {
       }
     };
   }, []);
+
+  const stopSpeaking = useCallback(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    utteranceRef.current = null;
+    setIsSpeaking(false);
+  }, []);
+
+  const pickPreferredVoice = useCallback((voices: SpeechSynthesisVoice[]) => {
+    if (!voices.length) return null;
+
+    const isFemaleVoice = (voice: SpeechSynthesisVoice) =>
+      /(female|woman|zira|susan|samantha|karen|aria|heera|priya|veena|ananya)/i.test(
+        `${voice.name} ${voice.voiceURI}`
+      );
+
+    const indianFemale = voices.find(
+      (voice) => /^(en-IN|hi-IN)$/i.test(voice.lang) && isFemaleVoice(voice)
+    );
+    if (indianFemale) return indianFemale;
+
+    const anyFemale = voices.find((voice) => isFemaleVoice(voice));
+    if (anyFemale) return anyFemale;
+
+    const anyIndian = voices.find((voice) => /^(en-IN|hi-IN)$/i.test(voice.lang));
+    if (anyIndian) return anyIndian;
+
+    return voices[0];
+  }, []);
+
+  const speakQuestion = useCallback((text: string) => {
+    if (typeof window === "undefined") return;
+    if (!readAloudSupported || !text.trim()) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text.trim());
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = pickPreferredVoice(voices);
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+        utterance.lang = preferredVoice.lang;
+      } else {
+        utterance.lang = navigator.language || "en-US";
+      }
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        utteranceRef.current = null;
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setSpeechError("Unable to read aloud this question.");
+        utteranceRef.current = null;
+      };
+      utteranceRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setSpeechError("Unable to read aloud this question.");
+      setIsSpeaking(false);
+    }
+  }, [pickPreferredVoice, readAloudSupported]);
 
   useEffect(() => {
     if (!interviewReport) return;
@@ -309,6 +431,52 @@ export default function AIInterview() {
     };
   }, [interviewReport, questions.length]);
 
+  const buildQuestionHistory = () =>
+    questions.map((question) => ({
+      id: question.id,
+      prompt: question.prompt,
+      category: question.category,
+      answer: answers[question.id]?.trim() || "",
+    }));
+
+  const generateAdaptiveQuestion = async (
+    historyOverride?: Array<{
+      id: string;
+      prompt: string;
+      category: string;
+      answer: string;
+    }>
+  ) => {
+    const response = await fetch("/api/aiInterviewChat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "adaptive",
+        contextPrompt: contextPrompt.trim(),
+        resumeData,
+        resume: resumePayload,
+        questionHistory: historyOverride ?? buildQuestionHistory(),
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json()) as { message?: string };
+      throw new Error(payload?.message || "Failed to generate next question.");
+    }
+
+    const data = (await response.json()) as { question?: InterviewQuestion };
+    if (!data.question?.prompt) {
+      throw new Error("Adaptive question was empty.");
+    }
+
+    const fallbackId = `q-${(historyOverride ?? buildQuestionHistory()).length + 1}`;
+    return {
+      id: data.question.id?.trim() || fallbackId,
+      prompt: data.question.prompt.trim(),
+      category: data.question.category?.trim() || "Adaptive",
+    } satisfies InterviewQuestion;
+  };
+
   const startChatInterview = async () => {
     setErrorMessage(null);
     setInterviewReport(null);
@@ -319,42 +487,17 @@ export default function AIInterview() {
     setQuestions([]);
     setAnswers({});
     setCurrentIndex(0);
-    setQuestionLoading(false);
-
-    const trimmedContext = contextPrompt.trim();
-    if (!trimmedContext) {
-      setQuestions(SUBJECTIVE_QUESTIONS);
-      return;
-    }
-
+    stopSpeaking();
     setQuestionLoading(true);
+
     try {
-      const response = await fetch("/api/aiInterviewChat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "questions",
-          contextPrompt: trimmedContext,
-          questionCount: SUBJECTIVE_QUESTIONS.length,
-        }),
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json()) as { message?: string };
-        throw new Error(payload?.message || "Failed to generate questions.");
-      }
-
-      const data = (await response.json()) as { questions?: InterviewQuestion[] };
-      if (!data.questions?.length) {
-        throw new Error("Question list was empty.");
-      }
-
-      setQuestions(data.questions);
+      const firstQuestion = await generateAdaptiveQuestion([]);
+      setQuestions([firstQuestion]);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Unable to generate questions.";
+        error instanceof Error ? error.message : "Unable to generate first question.";
       setErrorMessage(message);
-      setQuestions(SUBJECTIVE_QUESTIONS);
+      setQuestions([SUBJECTIVE_QUESTIONS[0]]);
     } finally {
       setQuestionLoading(false);
     }
@@ -382,7 +525,7 @@ export default function AIInterview() {
     ];
   };
 
-  const goToNext = () => {
+  const goToNext = async () => {
     const currentQuestion = questions[currentIndex];
     if (!currentQuestion) return;
     if (!answers[currentQuestion.id]?.trim()) return;
@@ -390,6 +533,33 @@ export default function AIInterview() {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => Math.min(prev + 1, questions.length - 1));
       return;
+    }
+
+    if (questions.length >= MAX_QUESTIONS || questionLoading) return;
+
+    setQuestionLoading(true);
+    setErrorMessage(null);
+    try {
+      const history = buildQuestionHistory();
+      const nextQuestion = await generateAdaptiveQuestion(history);
+      const nextId = `q-${questions.length + 1}`;
+      const normalizedNext: InterviewQuestion = {
+        id: nextId,
+        prompt: nextQuestion.prompt,
+        category: nextQuestion.category,
+      };
+      setQuestions((prev) => [...prev, normalizedNext]);
+      setCurrentIndex((prev) => prev + 1);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to generate next question.";
+      setErrorMessage(message);
+      if (questions.length < SUBJECTIVE_QUESTIONS.length) {
+        setQuestions((prev) => [...prev, SUBJECTIVE_QUESTIONS[questions.length]]);
+        setCurrentIndex((prev) => prev + 1);
+      }
+    } finally {
+      setQuestionLoading(false);
     }
   };
 
@@ -425,6 +595,7 @@ export default function AIInterview() {
         body: JSON.stringify({
           mode: "report",
           contextPrompt,
+          resumeData,
           messages: conversationRef.current,
           startedAt: interviewStartedAt,
           completedAt: completedAtOverride ?? interviewCompletedAt ?? Date.now(),
@@ -458,6 +629,7 @@ export default function AIInterview() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!contextPrompt.trim()) return;
     setView("interact");
     if (activeCard === "chat") {
       await startChatInterview();
@@ -473,8 +645,11 @@ export default function AIInterview() {
     setInterviewStartedAt(null);
     setInterviewCompletedAt(null);
     setReportLoading(false);
+    setQuestionLoading(false);
     setRecordingQuestionId(null);
+    setSpeechError("");
     recordingQuestionIdRef.current = null;
+    stopSpeaking();
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
       silenceTimeoutRef.current = null;
@@ -509,13 +684,35 @@ export default function AIInterview() {
           recognitionRef.current?.stop();
         }, 5000);
       }
-    } catch (err) {
+    } catch {
       setSpeechError("Unable to start speech recording.");
     }
   };
 
   const currentQuestion = questions[currentIndex];
   const isRecording = recordingQuestionId === currentQuestion?.id;
+  const canSubmitContext = contextPrompt.trim().length > 0;
+
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+    };
+  }, [stopSpeaking]);
+
+  useEffect(() => {
+    if (!currentQuestion?.prompt) return;
+    if (!autoReadAloud || !readAloudSupported) return;
+    if (view !== "interact" || activeCard !== "chat") return;
+    speakQuestion(currentQuestion.prompt);
+  }, [
+    activeCard,
+    autoReadAloud,
+    currentQuestion?.id,
+    currentQuestion?.prompt,
+    readAloudSupported,
+    speakQuestion,
+    view,
+  ]);
 
   return (
     <Layout>
@@ -568,7 +765,7 @@ export default function AIInterview() {
                   Start Chat Interview
                 </button>
               </div>
-              <div
+              {/* <div
                 role="button"
                 tabIndex={0}
                 onClick={() => setActiveCard("audio")}
@@ -582,7 +779,7 @@ export default function AIInterview() {
               >
                 <div className={styles.cardHeader}>
                   <div>
-                    <h3>🎤 AI Audio Interview</h3>
+                    <h3>ðŸŽ¤ AI Audio Interview</h3>
                     <p>
                       Practice speaking aloud with a live, voice-first interview flow.
                       Build composure and delivery with immediate, actionable feedback.
@@ -598,7 +795,7 @@ export default function AIInterview() {
                 <button type="button" className={`btn-primary ${styles.cardButton}`}>
                   Start Audio Interview
                 </button>
-              </div>
+              </div> */}
             </div>
 
             {activeCard ? (
@@ -620,7 +817,11 @@ export default function AIInterview() {
                 </div>
 
                 <div className={styles.submitRow}>
-                  <button type="submit" className="btn-primary">
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={!canSubmitContext}
+                  >
                     Submit
                   </button>
                 </div>
@@ -773,6 +974,21 @@ export default function AIInterview() {
                           </div>
                         ) : null}
                       </div>
+
+                      {interviewReport.questionFeedback?.length ? (
+                        <div className={styles.reportSection}>
+                          <div className={styles.sectionTitle}>📌 Question-wise Feedback</div>
+                          <ul className={styles.sectionList}>
+                            {interviewReport.questionFeedback.map((item, idx) => (
+                              <li key={`question-feedback-${item.questionId || idx}`}>
+                                <strong>{item.question || `Question ${idx + 1}`}</strong>
+                                <br />
+                                {item.feedback}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <>
@@ -785,8 +1001,8 @@ export default function AIInterview() {
                           {questionLoading
                             ? "Generating..."
                             : questions.length
-                              ? `${currentIndex + 1}/${questions.length}`
-                          : `0/${SUBJECTIVE_QUESTIONS.length}`}
+                              ? `${currentIndex + 1}/${MAX_QUESTIONS}`
+                              : `0/${MAX_QUESTIONS}`}
                         </div>
                       </div>
 
@@ -796,14 +1012,43 @@ export default function AIInterview() {
 
                       {questions.length ? (
                         <div className={styles.questionCard}>
-                          <div className={styles.questionTitle}>
-                            {currentQuestion
-                              ? `Question ${currentIndex + 1}/${questions.length}`
-                              : "Question"}
+                          <div className={styles.questionTopRow}>
+                            <div className={styles.questionTitle}>
+                              {currentQuestion
+                                ? `Question ${currentIndex + 1}/${MAX_QUESTIONS}`
+                                : "Question"}
+                            </div>
+                            {readAloudSupported ? (
+                              <button
+                                type="button"
+                                className={styles.readAloudButton}
+                                onClick={() => {
+                                  if (!currentQuestion) return;
+                                  if (isSpeaking) {
+                                    stopSpeaking();
+                                    return;
+                                  }
+                                  speakQuestion(currentQuestion.prompt);
+                                }}
+                                disabled={!currentQuestion}
+                              >
+                                {isSpeaking ? "Stop Audio" : "Read Aloud"}
+                              </button>
+                            ) : null}
                           </div>
                           <div className={styles.questionText}>
                             {currentQuestion?.prompt}
                           </div>
+                          {readAloudSupported ? (
+                            <label className={styles.autoReadToggle}>
+                              <input
+                                type="checkbox"
+                                checked={autoReadAloud}
+                                onChange={(event) => setAutoReadAloud(event.target.checked)}
+                              />
+                              Auto read new questions
+                            </label>
+                          ) : null}
                           <div className={styles.answerBlock}>
                             <div className={styles.answerInputWrapper}>
                               <textarea
@@ -867,13 +1112,18 @@ export default function AIInterview() {
                               <button
                                 type="button"
                                 className="btn-primary"
-                                onClick={goToNext}
+                                onClick={() => {
+                                  void goToNext();
+                                }}
                                 disabled={
+                                  questionLoading ||
                                   !questions[currentIndex] ||
-                                  !answers[questions[currentIndex].id]?.trim()
+                                  !answers[questions[currentIndex].id]?.trim() ||
+                                  (currentIndex === questions.length - 1 &&
+                                    questions.length >= MAX_QUESTIONS)
                                 }
                               >
-                                Next Question
+                                {questionLoading ? "Generating..." : "Next Question"}
                               </button>
                             </>
                           ) : null}
@@ -901,3 +1151,4 @@ export default function AIInterview() {
     </Layout>
   );
 }
+

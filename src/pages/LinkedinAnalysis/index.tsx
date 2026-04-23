@@ -418,7 +418,7 @@ export default function LinkedinAnalysis() {
       try {
         if (typeof window !== "undefined") {
           try {
-            const raw = window.localStorage.getItem("upeducateJobPrefix");
+            const raw = window.localStorage.getItem("educators360JobPrefix");
             const cached = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
             const cachedResume = cached?.resume;
             if (cachedResume && typeof cachedResume === "object") {
@@ -438,7 +438,7 @@ export default function LinkedinAnalysis() {
         }
 
         const db = getDb();
-        const userRef = doc(db, "upEducatePlusUsers", session.email.toLowerCase());
+        const userRef = doc(db, "Educators360Users", session.email.toLowerCase());
         const snap = await getDoc(userRef);
         const data = snap.exists() ? (snap.data() as Record<string, unknown>) : null;
         const resume = data?.resume;
@@ -823,7 +823,7 @@ export default function LinkedinAnalysis() {
               disabled={isLoading || resumeStatus !== "present"}
               onClick={() => setActiveCard("noLinkedin")}
             >
-              {isLoading ? "Building..." : "Build Linkedin Profie"}
+              {isLoading ? "Building..." : "Build LinkedIn Profile"}
             </button>
           </form>
         </div>
@@ -1041,3 +1041,4 @@ export default function LinkedinAnalysis() {
     </Layout>
   );
 }
+

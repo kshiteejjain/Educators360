@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import Image, { type StaticImageData } from "next/image";
 import type { FormEvent } from "react";
 import Layout from "@/components/Layout/Layout";
@@ -239,7 +239,7 @@ export default function ResumeBuilder() {
     if (typeof window === "undefined" || hasHydratedResume.current) return;
     hasHydratedResume.current = true;
     try {
-      const raw = window.localStorage.getItem("upeducateJobPrefix");
+      const raw = window.localStorage.getItem("educators360JobPrefix");
       const cached = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
       const resumeRecord = cached?.resume;
       if (!resumeRecord || typeof resumeRecord !== "object") return;
@@ -335,7 +335,7 @@ export default function ResumeBuilder() {
     const hydrateTargetRole = async () => {
       try {
         const db = getDb();
-        const userRef = doc(db, "upEducatePlusUsers", session.email.toLowerCase());
+        const userRef = doc(db, "Educators360Users", session.email.toLowerCase());
         const snap = await getDoc(userRef);
         if (!snap.exists()) return;
         const data = snap.data() as { targetRole?: unknown };
@@ -344,10 +344,10 @@ export default function ResumeBuilder() {
         if (!nextTargetRole) return;
         setTargetJob(nextTargetRole);
         try {
-          const raw = window.localStorage.getItem("upeducateJobPrefix");
+          const raw = window.localStorage.getItem("educators360JobPrefix");
           const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
           const next = { ...existing, targetRole: nextTargetRole };
-          window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(next));
+          window.localStorage.setItem("educators360JobPrefix", JSON.stringify(next));
         } catch (error) {
           console.warn("Failed to store target role from firestore", error);
         }
@@ -363,10 +363,10 @@ export default function ResumeBuilder() {
     const trimmed = targetJob.trim();
     if (!trimmed || typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem("upeducateJobPrefix");
+      const raw = window.localStorage.getItem("educators360JobPrefix");
       const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
       const next = { ...existing, targetRole: trimmed };
-      window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(next));
+      window.localStorage.setItem("educators360JobPrefix", JSON.stringify(next));
     } catch (error) {
       console.warn("Failed to store target role", error);
     }
@@ -376,7 +376,7 @@ export default function ResumeBuilder() {
     const persistTargetRole = async () => {
       try {
         const db = getDb();
-        const userRef = doc(db, "upEducatePlusUsers", session.email.toLowerCase());
+        const userRef = doc(db, "Educators360Users", session.email.toLowerCase());
         await setDoc(
           userRef,
           { targetRole: trimmed, targetRoleUpdatedAt: serverTimestamp() },
@@ -562,7 +562,7 @@ export default function ResumeBuilder() {
     try {
       await withLoader(async () => {
         const db = getDb();
-        const userRef = doc(db, "upEducatePlusUsers", session.email.toLowerCase());
+        const userRef = doc(db, "Educators360Users", session.email.toLowerCase());
         const resumePayload = {
           templateId: selectedTemplate.id,
           templateName: selectedTemplate.title || "",
@@ -589,10 +589,10 @@ export default function ResumeBuilder() {
 
         if (typeof window !== "undefined") {
           try {
-            const raw = window.localStorage.getItem("upeducateJobPrefix");
+            const raw = window.localStorage.getItem("educators360JobPrefix");
             const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
             const next = { ...existing, resume: resumePayload };
-            window.localStorage.setItem("upeducateJobPrefix", JSON.stringify(next));
+            window.localStorage.setItem("educators360JobPrefix", JSON.stringify(next));
           } catch (error) {
             console.warn("Failed to store resume in local storage", error);
           }
@@ -1029,7 +1029,7 @@ export default function ResumeBuilder() {
 
     const cleanCertification = (value: string) =>
       value
-        .replace(/^[\s\-*•\u2022]+/, "")
+        .replace(/^[\s\-*�\u2022]+/, "")
         .replace(/\s+/g, " ")
         .trim();
 
@@ -1328,10 +1328,10 @@ export default function ResumeBuilder() {
                       e.stopPropagation();
                     }}
                   >
-                    🗑️
+                    ???
                   </button>
                   <span className={styles.photoCamera} aria-hidden="true">
-                    📷
+                    ??
                   </span>
                   <input
                     ref={photoInputRef}
@@ -1403,8 +1403,8 @@ export default function ResumeBuilder() {
             </div>
           </div>
           <div className={`${styles.cleanMeta} ${styles.personalMeta}`}>
-            <span>✉ {form.email}</span>
-            <span>☎ {form.phone}</span>
+            <span>? {form.email}</span>
+            <span>? {form.phone}</span>
           </div>
         </div>
 
@@ -1420,7 +1420,7 @@ export default function ResumeBuilder() {
               {form.experiences.map((exp, idx) => (
                 <div key={idx} className={styles.cleanItem}>
                   <div className={styles.cleanItemTitle}>
-                    {exp.role} — {exp.company}
+                    {exp.role} � {exp.company}
                   </div>
                   <div className={styles.cleanItemMeta}>{exp.dates}</div>
                   <ul>
@@ -1491,7 +1491,7 @@ export default function ResumeBuilder() {
             <div className={styles.slateName}>{form.name}</div>
             <div className={styles.slateTitle}>{form.title}</div>
             <div className={`${styles.slateMeta} ${styles.personalMeta}`}>
-              {form.email} • {form.phone} • {form.location}
+              {form.email} � {form.phone} � {form.location}
             </div>
           </div>
         </div>
@@ -1508,7 +1508,7 @@ export default function ResumeBuilder() {
                 <div key={idx} className={styles.slateItem}>
                   <div className={styles.slateItemTitle}>{exp.role}</div>
                   <div className={styles.slateItemMeta}>
-                    {exp.company} • {exp.dates}
+                    {exp.company} � {exp.dates}
                   </div>
                   <ul>
                     {exp.bullets.map((b, i) => (
@@ -1583,7 +1583,7 @@ export default function ResumeBuilder() {
             className={`${styles.tabButton} ${activeTab === "upload" ? styles.tabActive : ""}`}
             onClick={() => setActiveTab("upload")}
           >
-            🚀 Upload Resume
+            ?? Upload Resume
           </button>
           <button
             className={`${styles.tabButton} ${activeTab === "manual" && manualMode === "build" ? styles.tabActive : ""}`}
@@ -1592,7 +1592,7 @@ export default function ResumeBuilder() {
               setManualMode("build");
             }}
           >
-            💼 Build Manually
+            ?? Build Manually
           </button>
           <button
             className={`${styles.tabButton} ${activeTab === "manual" && manualMode === "edit" ? styles.tabActive : ""}`}
@@ -1601,7 +1601,7 @@ export default function ResumeBuilder() {
               setManualMode("edit");
             }}
           >
-            ✏️ Edit Resume
+            ?? Edit Resume
           </button>
         </div>
 
@@ -1634,7 +1634,7 @@ export default function ResumeBuilder() {
                   <div className="form-group">
                     <div className={styles.uploadRow}>
                       <label className={styles.fileButton}>
-                        📄 Upload your resume here
+                        ?? Upload your resume here
                         <input
                           type="file"
                           accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -1680,13 +1680,13 @@ export default function ResumeBuilder() {
                     <h2 className={styles.aiResumeTitle}>AI Feedback based on target role</h2>
                     <div ref={aiResultRef} className={styles.aiCard}>
                       <div className={styles.aiHeader}>
-                        <h3 className={styles.sectionTitle}>✨ AI Resume Review</h3>
-                        <span className={styles.aiScore}>⭐ {aiResult.score}/100</span>
+                        <h3 className={styles.sectionTitle}>? AI Resume Review</h3>
+                        <span className={styles.aiScore}>? {aiResult.score}/100</span>
                       </div>
                       <p className={styles.aiSummary}>{aiResult.summary}</p>
                       {!!aiResult.strengths.length && (
                         <div className={styles.aiBlock}>
-                          <h4>✅ Strengths</h4>
+                          <h4>? Strengths</h4>
                           <ul>
                             {aiResult.strengths.map((item, idx) => (
                               <li key={idx}>{renderAiItem(item)}</li>
@@ -1696,7 +1696,7 @@ export default function ResumeBuilder() {
                       )}
                       {!!aiResult.improvements.length && (
                         <div className={styles.aiBlock}>
-                          <h4>🛠️ Improvements</h4>
+                          <h4>??? Improvements</h4>
                           <ul>
                             {aiResult.improvements.map((item, idx) => (
                               <li key={idx}>{renderAiItem(item)}</li>
@@ -1706,7 +1706,7 @@ export default function ResumeBuilder() {
                       )}
                       {!!aiResult.suggestions.length && (
                         <div className={styles.aiBlock}>
-                          <h4>💡 Suggestions</h4>
+                          <h4>?? Suggestions</h4>
                           <ul>
                             {aiResult.suggestions.map((item, idx) => (
                               <li key={idx}>{renderAiItem(item)}</li>
@@ -1716,13 +1716,13 @@ export default function ResumeBuilder() {
                       )}
                       {aiResult.rewriteSummary && (
                         <div className={styles.aiBlock}>
-                          <h4>📝 Suggested Summary</h4>
+                          <h4>?? Suggested Summary</h4>
                           <p>{aiResult.rewriteSummary}</p>
                         </div>
                       )}
                       {!!aiResult.keywords.length && (
                         <div className={styles.aiBlock}>
-                          <h4>🏷️ Suggested Keywords</h4>
+                          <h4>??? Suggested Keywords</h4>
                           <div className={styles.keywordList}>
                             {aiResult.keywords.map((item, idx) => (
                               <span key={idx} className={styles.keywordTag}>
@@ -1820,7 +1820,7 @@ export default function ResumeBuilder() {
                               aria-label="Delete current photo"
                               title="Delete current photo"
                             >
-                              🗑️
+                              ???
                             </button>
                           </div>
                         </div>
@@ -2225,7 +2225,7 @@ export default function ResumeBuilder() {
                       onClick={() => setIsTemplateModalOpen(false)}
                       aria-label="Close template chooser"
                     >
-                      ✕
+                      ?
                     </button>
                   </div>
 
@@ -2294,7 +2294,7 @@ export default function ResumeBuilder() {
                   }
                 }}
               >
-                ✏️ Edit Resume
+                ?? Edit Resume
               </button>
             </div>
           </div>
@@ -2303,6 +2303,7 @@ export default function ResumeBuilder() {
     </Layout>
   );
 }
+
 
 
 

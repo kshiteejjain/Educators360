@@ -29,7 +29,7 @@ export default async function handler(
   }
 
   const db = getDb();
-  const userRef = doc(db, "upEducatePlus", email);
+  const userRef = doc(db, "Educators360", email);
 
   if (req.method === "GET") {
     const snap = await getDoc(userRef);
@@ -54,3 +54,4 @@ export default async function handler(
   const snap = await getDoc(userRef);
   return res.status(200).json({ user: snap.data() ?? null });
 }
+

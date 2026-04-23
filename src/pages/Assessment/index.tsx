@@ -41,7 +41,7 @@ type ViewMode = "cards" | "questions" | "report";
 
 const STORAGE_PREFIX = "assessment:questions:";
 const REPORT_PREFIX = "assessment:report:";
-const JOB_PREFIX_KEY = "upeducateJobPrefix";
+const JOB_PREFIX_KEY = "educators360JobPrefix";
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -1295,3 +1295,4 @@ export default function Assessment() {
     </Layout>
   );
 }
+

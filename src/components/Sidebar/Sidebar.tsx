@@ -66,7 +66,7 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         {...(isCollapsed
           ? {
               "data-tooltip-id": logoTooltipId,
-              "data-tooltip-content": "UpEducatePlus",
+              "data-tooltip-content": "Educators360",
             }
           : {})}
       >

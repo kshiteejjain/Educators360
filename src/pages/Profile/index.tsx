@@ -16,7 +16,7 @@ export default function Profile() {
   const storedProfile = useMemo(() => {
     if (typeof window === "undefined") return null;
     try {
-      const raw = window.localStorage.getItem("upeducateJobPrefix");
+      const raw = window.localStorage.getItem("educators360JobPrefix");
       if (!raw) return null;
       return JSON.parse(raw) as Record<string, unknown>;
     } catch (error) {
@@ -236,3 +236,4 @@ export default function Profile() {
     </Layout>
   );
 }
+

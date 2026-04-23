@@ -101,7 +101,7 @@ export default function ForgotPassword() {
     <div className={styles.loginPage}>
       <div className={styles.leftSection}>
         <div className="overlay">
-          <h1 className={styles.brand}>upEducatePlus</h1>
+          <h1 className={styles.brand}>Educators360</h1>
           <p className={styles.tagline}>
             Your AI-powered career companion delivering skills, mentorship,
             and opportunities for professional growth

@@ -108,7 +108,7 @@ export default function AIInterview() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem("upeducateJobPrefix");
+      const raw = window.localStorage.getItem("educators360JobPrefix");
       if (!raw) return;
       const parsed = JSON.parse(raw) as { name?: string };
       const name = parsed?.name?.trim();
@@ -1048,3 +1048,4 @@ setTimeout(() => endInterview("inactive"), 1200);
     </Layout>
   );
 }
+

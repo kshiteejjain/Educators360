@@ -40,7 +40,7 @@ export default async function handler(
 
   try {
     const db = getDb();
-    const usersRef = collection(db, "upEducatePlusUsers");
+    const usersRef = collection(db, "Educators360Users");
     const snapshot = await getDocs(usersRef);
 
     const members: Member[] = snapshot.docs.map((docSnap) => {
