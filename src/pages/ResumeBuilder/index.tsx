@@ -1029,7 +1029,7 @@ export default function ResumeBuilder() {
 
     const cleanCertification = (value: string) =>
       value
-        .replace(/^[\s\-*•\u2022]+/, "")
+        .replace(/^[\s\-*\u2022]+/, "")
         .replace(/\s+/g, " ")
         .trim();
 
@@ -1420,7 +1420,7 @@ export default function ResumeBuilder() {
               {form.experiences.map((exp, idx) => (
                 <div key={idx} className={styles.cleanItem}>
                   <div className={styles.cleanItemTitle}>
-                    {exp.role} — {exp.company}
+                    {exp.role} ï¿½ {exp.company}
                   </div>
                   <div className={styles.cleanItemMeta}>{exp.dates}</div>
                   <ul>
@@ -1491,7 +1491,7 @@ export default function ResumeBuilder() {
             <div className={styles.slateName}>{form.name}</div>
             <div className={styles.slateTitle}>{form.title}</div>
             <div className={`${styles.slateMeta} ${styles.personalMeta}`}>
-              {form.email} • {form.phone} • {form.location}
+              {form.email} ï¿½ {form.phone} ï¿½ {form.location}
             </div>
           </div>
         </div>
@@ -1508,7 +1508,7 @@ export default function ResumeBuilder() {
                 <div key={idx} className={styles.slateItem}>
                   <div className={styles.slateItemTitle}>{exp.role}</div>
                   <div className={styles.slateItemMeta}>
-                    {exp.company} • {exp.dates}
+                    {exp.company} ï¿½ {exp.dates}
                   </div>
                   <ul>
                     {exp.bullets.map((b, i) => (
