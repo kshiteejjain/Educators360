@@ -1328,10 +1328,10 @@ export default function ResumeBuilder() {
                       e.stopPropagation();
                     }}
                   >
-                    ???
+                    Delete
                   </button>
                   <span className={styles.photoCamera} aria-hidden="true">
-                    ??
+                    Camera
                   </span>
                   <input
                     ref={photoInputRef}
@@ -1583,7 +1583,7 @@ export default function ResumeBuilder() {
             className={`${styles.tabButton} ${activeTab === "upload" ? styles.tabActive : ""}`}
             onClick={() => setActiveTab("upload")}
           >
-            ?? Upload Resume
+            Upload Resume
           </button>
           <button
             className={`${styles.tabButton} ${activeTab === "manual" && manualMode === "build" ? styles.tabActive : ""}`}
@@ -1592,7 +1592,7 @@ export default function ResumeBuilder() {
               setManualMode("build");
             }}
           >
-            ?? Build Manually
+            Build Manually
           </button>
           <button
             className={`${styles.tabButton} ${activeTab === "manual" && manualMode === "edit" ? styles.tabActive : ""}`}
@@ -1601,7 +1601,7 @@ export default function ResumeBuilder() {
               setManualMode("edit");
             }}
           >
-            ?? Edit Resume
+            Edit Resume
           </button>
         </div>
 
@@ -1634,7 +1634,7 @@ export default function ResumeBuilder() {
                   <div className="form-group">
                     <div className={styles.uploadRow}>
                       <label className={styles.fileButton}>
-                        ?? Upload your resume here
+                        Upload your resume here
                         <input
                           type="file"
                           accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -1680,13 +1680,13 @@ export default function ResumeBuilder() {
                     <h2 className={styles.aiResumeTitle}>AI Feedback based on target role</h2>
                     <div ref={aiResultRef} className={styles.aiCard}>
                       <div className={styles.aiHeader}>
-                        <h3 className={styles.sectionTitle}>? AI Resume Review</h3>
-                        <span className={styles.aiScore}>? {aiResult.score}/100</span>
+                        <h3 className={styles.sectionTitle}>AI Resume Review</h3>
+                        <span className={styles.aiScore}>Score: {aiResult.score}/100</span>
                       </div>
                       <p className={styles.aiSummary}>{aiResult.summary}</p>
                       {!!aiResult.strengths.length && (
                         <div className={styles.aiBlock}>
-                          <h4>? Strengths</h4>
+                          <h4>Strengths</h4>
                           <ul>
                             {aiResult.strengths.map((item, idx) => (
                               <li key={idx}>{renderAiItem(item)}</li>
@@ -1696,7 +1696,7 @@ export default function ResumeBuilder() {
                       )}
                       {!!aiResult.improvements.length && (
                         <div className={styles.aiBlock}>
-                          <h4>??? Improvements</h4>
+                          <h4>Improvements</h4>
                           <ul>
                             {aiResult.improvements.map((item, idx) => (
                               <li key={idx}>{renderAiItem(item)}</li>
@@ -1706,7 +1706,7 @@ export default function ResumeBuilder() {
                       )}
                       {!!aiResult.suggestions.length && (
                         <div className={styles.aiBlock}>
-                          <h4>?? Suggestions</h4>
+                          <h4>Suggestions</h4>
                           <ul>
                             {aiResult.suggestions.map((item, idx) => (
                               <li key={idx}>{renderAiItem(item)}</li>
@@ -1716,13 +1716,13 @@ export default function ResumeBuilder() {
                       )}
                       {aiResult.rewriteSummary && (
                         <div className={styles.aiBlock}>
-                          <h4>?? Suggested Summary</h4>
+                          <h4>Suggested Summary</h4>
                           <p>{aiResult.rewriteSummary}</p>
                         </div>
                       )}
                       {!!aiResult.keywords.length && (
                         <div className={styles.aiBlock}>
-                          <h4>??? Suggested Keywords</h4>
+                          <h4>Suggested Keywords</h4>
                           <div className={styles.keywordList}>
                             {aiResult.keywords.map((item, idx) => (
                               <span key={idx} className={styles.keywordTag}>
@@ -1820,7 +1820,7 @@ export default function ResumeBuilder() {
                               aria-label="Delete current photo"
                               title="Delete current photo"
                             >
-                              ???
+                              Delete
                             </button>
                           </div>
                         </div>
@@ -2294,7 +2294,7 @@ export default function ResumeBuilder() {
                   }
                 }}
               >
-                ?? Edit Resume
+                Edit Resume
               </button>
             </div>
           </div>

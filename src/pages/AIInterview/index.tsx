@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import Chart from "chart.js/auto";
 import Layout from "@/components/Layout/Layout";
 import Loader from "@/components/Loader/Loader";
@@ -32,7 +33,6 @@ type InterviewReport = {
   timeTakenSeconds: number | null;
   answeredQuestions: number;
   totalQuestions: number;
-  completionStatus: "complete" | "incomplete";
   summary: string;
   strengths: string[];
   gaps: string[];
@@ -107,7 +107,7 @@ export default function AIInterview() {
   const [view, setView] = useState<ViewMode>("configure");
   const [contextPrompt, setContextPrompt] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeCard, setActiveCard] = useState<"chat" | "audio" | null>(null);
+  const [activeCard, setActiveCard] = useState<"chat" | null>(null);
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
@@ -121,6 +121,9 @@ export default function AIInterview() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [resumeData, setResumeData] = useState<Record<string, unknown> | null>(null);
   const [resumePayload, setResumePayload] = useState<Record<string, unknown> | null>(null);
+  const [resumeStatus, setResumeStatus] = useState<"checking" | "present" | "missing">(
+    "checking"
+  );
   const [readAloudSupported, setReadAloudSupported] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [autoReadAloud, setAutoReadAloud] = useState(true);
@@ -138,23 +141,12 @@ export default function AIInterview() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const existing = document.querySelector(
-      'script[data-elevenlabs-convai="true"]'
-    ) as HTMLScriptElement | null;
-    if (existing) return;
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
-    script.async = true;
-    script.type = "text/javascript";
-    script.dataset.elevenlabsConvai = "true";
-    document.body.appendChild(script);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(JOB_PREFIX_STORAGE_KEY);
-      if (!raw) return;
+      if (!raw) {
+        setResumeStatus("missing");
+        return;
+      }
       const parsed = JSON.parse(raw) as StoredProfile;
       const resume =
         parsed?.resume && typeof parsed.resume === "object" ? parsed.resume : null;
@@ -164,7 +156,10 @@ export default function AIInterview() {
         (resume as Record<string, unknown>).data !== null
           ? ((resume as Record<string, unknown>).data as Record<string, unknown>)
           : null;
-      if (!data) return;
+      if (!data) {
+        setResumeStatus("missing");
+        return;
+      }
       setResumeData(data);
       setResumePayload({
         ...(resume as Record<string, unknown>),
@@ -173,8 +168,10 @@ export default function AIInterview() {
           resumeData: data,
         },
       });
+      setResumeStatus("present");
     } catch (error) {
       console.warn("Failed to read local profile from storage", error);
+      setResumeStatus("missing");
     }
   }, []);
 
@@ -371,17 +368,20 @@ export default function AIInterview() {
       completionChartRef.current = null;
     }
 
-    if (scoreCanvasRef.current) {
-      scoreChartRef.current = new Chart<"doughnut", number[], string>(
-        scoreCanvasRef.current,
-        {
+    const createDoughnutChart = (
+      canvas: HTMLCanvasElement,
+      labels: string[],
+      data: number[],
+      backgroundColor: string[]
+    ) =>
+      new Chart<"doughnut", number[], string>(canvas, {
         type: "doughnut",
         data: {
-          labels: ["Score", "Remaining"],
+          labels,
           datasets: [
             {
-              data: scoreData,
-              backgroundColor: ["#16a34a", "#e2e8f0"],
+              data,
+              backgroundColor,
               borderWidth: 0,
             },
           ],
@@ -393,33 +393,23 @@ export default function AIInterview() {
           },
           cutout: "70%",
         },
-      }
+      });
+
+    if (scoreCanvasRef.current) {
+      scoreChartRef.current = createDoughnutChart(
+        scoreCanvasRef.current,
+        ["Score", "Remaining"],
+        scoreData,
+        ["#16a34a", "#e2e8f0"]
       );
     }
 
     if (completionCanvasRef.current) {
-      completionChartRef.current = new Chart<"doughnut", number[], string>(
+      completionChartRef.current = createDoughnutChart(
         completionCanvasRef.current,
-        {
-        type: "doughnut",
-        data: {
-          labels: ["Answered", "Remaining"],
-          datasets: [
-            {
-              data: completionData,
-              backgroundColor: ["#0ea5e9", "#e2e8f0"],
-              borderWidth: 0,
-            },
-          ],
-        },
-        options: {
-          plugins: {
-            legend: { display: false },
-            tooltip: { enabled: true },
-          },
-          cutout: "70%",
-        },
-      }
+        ["Answered", "Remaining"],
+        completionData,
+        ["#0ea5e9", "#e2e8f0"]
       );
     }
 
@@ -542,9 +532,8 @@ export default function AIInterview() {
     try {
       const history = buildQuestionHistory();
       const nextQuestion = await generateAdaptiveQuestion(history);
-      const nextId = `q-${questions.length + 1}`;
       const normalizedNext: InterviewQuestion = {
-        id: nextId,
+        id: nextQuestion.id,
         prompt: nextQuestion.prompt,
         category: nextQuestion.category,
       };
@@ -568,18 +557,16 @@ export default function AIInterview() {
   };
 
   const submitInterview = () => {
-    const hasAnyAnswer = Object.values(answers).some((answer) => answer.trim());
-    if (!hasAnyAnswer) return;
     const completedAt = Date.now();
-    buildConversationFromAnswers();
     setInterviewCompletedAt(completedAt);
     void fetchInterviewReport(completedAt);
   };
 
+  const hasAnswers = () => Object.values(answers).some((answer) => answer.trim());
+
   const fetchInterviewReport = async (completedAtOverride?: number) => {
     if (!interviewStartedAt) return;
-    const hasAnyAnswer = Object.values(answers).some((answer) => answer.trim());
-    if (!hasAnyAnswer) {
+    if (!hasAnswers()) {
       setErrorMessage("Please answer at least one question to complete the interview.");
       return;
     }
@@ -629,7 +616,19 @@ export default function AIInterview() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contextPrompt.trim()) return;
+    setErrorMessage(null);
+    if (!activeCard) {
+      setErrorMessage("Please select an interview mode to continue.");
+      return;
+    }
+    if (resumeStatus !== "present") {
+      setErrorMessage("Please upload or create your resume to access this feature.");
+      return;
+    }
+    if (!contextPrompt.trim()) {
+      setErrorMessage("Please add interview context before submitting.");
+      return;
+    }
     setView("interact");
     if (activeCard === "chat") {
       await startChatInterview();
@@ -691,8 +690,6 @@ export default function AIInterview() {
 
   const currentQuestion = questions[currentIndex];
   const isRecording = recordingQuestionId === currentQuestion?.id;
-  const canSubmitContext = contextPrompt.trim().length > 0;
-
   useEffect(() => {
     return () => {
       stopSpeaking();
@@ -725,21 +722,34 @@ export default function AIInterview() {
           <>
             <div className={styles.headerRow}>
               <div>
-                <h2 className={styles.title}>Configure AI Agent</h2>
+                <h2 className={styles.title}>AI Interview</h2>
                 <p className={styles.subtitle}>
-                  Set up your AI coach&apos;s behavior and capabilities
+                  Helps you practice and prepare for interviews by simulating realistic Q&A sessions with an AI coach.
                 </p>
               </div>
             </div>
+            {resumeStatus === "missing" ? (
+              <div className={styles.pageAlert}>
+                <div className={styles.pageAlertTitle}>Resume required</div>
+                <div className={styles.pageAlertBody}>
+                  Please create or upload your resume before starting the AI interview.{" "}
+                  <Link href="/ResumeBuilder">Go to Resume Builder</Link>.
+                </div>
+              </div>
+            ) : null}
 
             <div className={styles.inputCards}>
               <div
                 role="button"
                 tabIndex={0}
-                onClick={() => setActiveCard("chat")}
+                onClick={() => {
+                  setActiveCard("chat");
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     setActiveCard("chat");
+                    if (errorMessage) setErrorMessage(null);
                   }
                 }}
                 className={`${styles.inputCard} ${activeCard === "chat" ? styles.cardActive : styles.cardInactive
@@ -747,7 +757,7 @@ export default function AIInterview() {
               >
                 <div className={styles.cardHeader}>
                   <div>
-                    <h3>💬 Chat Interview</h3>
+                    <h3>💬 Begin Interview</h3>
                     <p>
                       Run a realistic, text-based interview with your AI coach.
                       Perfect for practicing structure, clarity, and confidence before
@@ -759,43 +769,12 @@ export default function AIInterview() {
                       <li>STAR-style coaching with clear strengths and gaps</li>
                     </ul>
                   </div>
-                  <span className={styles.cardBadge}>AI Chat</span>
+                  <span className={styles.cardBadge}>AI Coach</span>
                 </div>
                 <button type="button" className={`btn-primary ${styles.cardButton}`}>
-                  Start Chat Interview
+                  Start AI Interview
                 </button>
               </div>
-              {/* <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setActiveCard("audio")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setActiveCard("audio");
-                  }
-                }}
-                className={`${styles.inputCard} ${activeCard === "audio" ? styles.cardActive : styles.cardInactive
-                  }`}
-              >
-                <div className={styles.cardHeader}>
-                  <div>
-                    <h3>ðŸŽ¤ AI Audio Interview</h3>
-                    <p>
-                      Practice speaking aloud with a live, voice-first interview flow.
-                      Build composure and delivery with immediate, actionable feedback.
-                    </p>
-                    <ul>
-                      <li>Live voice simulation with pacing cues</li>
-                      <li>Real-time listening for natural flow</li>
-                      <li>Delivery tips on clarity, filler words, and structure</li>
-                    </ul>
-                  </div>
-                  <span className={styles.cardBadge}>Voice</span>
-                </div>
-                <button type="button" className={`btn-primary ${styles.cardButton}`}>
-                  Start Audio Interview
-                </button>
-              </div> */}
             </div>
 
             {activeCard ? (
@@ -810,7 +789,10 @@ export default function AIInterview() {
                       id="contextPrompt"
                       className="form-control"
                       value={contextPrompt}
-                      onChange={(e) => setContextPrompt(e.target.value)}
+                      onChange={(e) => {
+                        setContextPrompt(e.target.value);
+                        if (errorMessage) setErrorMessage(null);
+                      }}
                       placeholder="I am Math teacher"
                     />
                   </div>
@@ -820,7 +802,6 @@ export default function AIInterview() {
                   <button
                     type="submit"
                     className="btn-primary"
-                    disabled={!canSubmitContext}
                   >
                     Submit
                   </button>
@@ -839,14 +820,9 @@ export default function AIInterview() {
               </button>
             </div>
 
-            {activeCard === "audio" ? (
-              <div className={styles.audioWidgetWrap}>
-                <elevenlabs-convai agent-id="agent_0501kgpypb14f37rvfdwkx63art4"></elevenlabs-convai>
-              </div>
-            ) : (
-              <div className={styles.interviewLayout}>
-                <main className={styles.questionPanel}>
-                  {interviewReport ? (
+            <div className={styles.interviewLayout}>
+              <main className={styles.questionPanel}>
+                {interviewReport ? (
                     <div className={styles.reportPanel}>
                       <div className={styles.reportHeader}>
                         <div>
@@ -990,8 +966,8 @@ export default function AIInterview() {
                         </div>
                       ) : null}
                     </div>
-                  ) : (
-                    <>
+                ) : (
+                  <>
                       <div className={styles.questionHeader}>
                         <div>
                           <h3>Interview Questions</h3>
@@ -1071,7 +1047,7 @@ export default function AIInterview() {
                                   }`}
                                   onClick={() => toggleRecordingForQuestion(currentQuestion.id)}
                                   aria-label="Start recording"
-                                  disabled={Boolean(interviewCompletedAt) || isRecording}
+                                  disabled={Boolean(interviewCompletedAt) || isRecording || isSpeaking}
                                 >
                                   <img src="/mic.svg" alt="Mic" width={18} height={18} />
                                 </button>
@@ -1132,19 +1108,17 @@ export default function AIInterview() {
                             className="btn-primary"
                             onClick={submitInterview}
                             disabled={
-                              reportLoading ||
-                              !Object.values(answers).some((answer) => answer.trim())
+                              reportLoading || !hasAnswers()
                             }
                           >
                             {reportLoading ? "Generating Report..." : "Submit Interview"}
                           </button>
                         </div>
                       ) : null}
-                    </>
-                  )}
-                </main>
-              </div>
-            )}
+                  </>
+                )}
+              </main>
+            </div>
           </>
         )}
       </section>
