@@ -9,15 +9,7 @@
   --color-green: #10b981;
   --color-text: #474747;
   --color-gray: #c2cacc;
-  --color-error: #d64545
-}
-
-html,
-body {
-  font-size: var(--font-size-base);
-  max-width: 100vw;
-  overflow-x: hidden;
-  background-color: var(--color-blue-gray);
+  --color-error: #d64545;
 }
 
 @font-face {
@@ -325,3 +317,5 @@ textarea.form-control {
   background-color: var(--color-primary);
   color: var(--color-white);
 }
+
+

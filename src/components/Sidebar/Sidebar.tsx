@@ -29,7 +29,6 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const currentPath = router.pathname;
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showCollapsedLogo, setShowCollapsedLogo] = useState(isCollapsed);
-  const logoTooltipId = useId();
   const menuTooltipId = useId();
 
   useEffect(() => {
@@ -61,28 +60,11 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
     <aside
       className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ""}`}
     >
-      <div
-        className={styles.logo}
-        {...(isCollapsed
-          ? {
-              "data-tooltip-id": logoTooltipId,
-              "data-tooltip-content": "Educators360",
-            }
-          : {})}
-      >
+      <div className={styles.logo}>
         {!showCollapsedLogo ? <Image src="/logo.svg" alt="Logo" width={200} height={48} priority /> :
           <Image src="/logo-collapsed.svg" alt="Logo" width={48} height={48} priority className={styles.collapsedLogo} />
         }
       </div>
-      {isCollapsed ? (
-        <Tooltip
-          id={logoTooltipId}
-          className={styles.sidebarTooltip}
-          place="right"
-          offset={12}
-          positionStrategy="fixed"
-        />
-      ) : null}
 
       <button
         type="button"

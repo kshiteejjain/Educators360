@@ -106,8 +106,9 @@ const JOB_PREFIX_STORAGE_KEY = "educators360JobPrefix";
 export default function AIInterview() {
   const [view, setView] = useState<ViewMode>("configure");
   const [contextPrompt, setContextPrompt] = useState("");
+  const [contextPromptError, setContextPromptError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeCard, setActiveCard] = useState<"chat" | null>(null);
+  const activeCard = "chat" as const;
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
@@ -562,6 +563,14 @@ export default function AIInterview() {
     void fetchInterviewReport(completedAt);
   };
 
+  const validateContextPrompt = (value: string) => {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+      return "Please add interview context before submitting.";
+    }
+    return null;
+  };
+
   const hasAnswers = () => Object.values(answers).some((answer) => answer.trim());
 
   const fetchInterviewReport = async (completedAtOverride?: number) => {
@@ -617,18 +626,16 @@ export default function AIInterview() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    if (!activeCard) {
-      setErrorMessage("Please select an interview mode to continue.");
-      return;
-    }
     if (resumeStatus !== "present") {
       setErrorMessage("Please upload or create your resume to access this feature.");
       return;
     }
-    if (!contextPrompt.trim()) {
-      setErrorMessage("Please add interview context before submitting.");
+    const validationError = validateContextPrompt(contextPrompt);
+    if (validationError) {
+      setContextPromptError(validationError);
       return;
     }
+    setContextPromptError(null);
     setView("interact");
     if (activeCard === "chat") {
       await startChatInterview();
@@ -724,7 +731,8 @@ export default function AIInterview() {
               <div>
                 <h2 className={styles.title}>AI Interview</h2>
                 <p className={styles.subtitle}>
-                  Helps you practice and prepare for interviews by simulating realistic Q&A sessions with an AI coach.
+                  Practice realistic Q&A sessions with an AI coach. Get instant feedback on
+                  structure, clarity, and confidence before the real thing.
                 </p>
               </div>
             </div>
@@ -738,76 +746,133 @@ export default function AIInterview() {
               </div>
             ) : null}
 
-            <div className={styles.inputCards}>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  setActiveCard("chat");
-                  if (errorMessage) setErrorMessage(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setActiveCard("chat");
-                    if (errorMessage) setErrorMessage(null);
-                  }
-                }}
-                className={`${styles.inputCard} ${activeCard === "chat" ? styles.cardActive : styles.cardInactive
-                  }`}
-              >
-                <div className={styles.cardHeader}>
-                  <div>
-                    <h3>💬 Begin Interview</h3>
-                    <p>
-                      Run a realistic, text-based interview with your AI coach.
-                      Perfect for practicing structure, clarity, and confidence before
-                      the real thing.
-                    </p>
-                    <ul>
-                      <li>Structured questions with instant AI feedback</li>
-                      <li>Guided follow-ups tailored to your role</li>
-                      <li>STAR-style coaching with clear strengths and gaps</li>
-                    </ul>
-                  </div>
-                  <span className={styles.cardBadge}>AI Coach</span>
-                </div>
-                <button type="button" className={`btn-primary ${styles.cardButton}`}>
-                  Start AI Interview
-                </button>
-              </div>
-            </div>
-
-            {activeCard ? (
-              <form className={styles.card} onSubmit={handleSubmit}>
+            <div className={styles.configureGrid}>
+              <form className={styles.configureCard} onSubmit={handleSubmit}>
                 <div>
-                  <div className="form-group">
-                    <label htmlFor="contextPrompt">
-                      Add Detailed Prompt for Interview Context (Example - Interviewer profile,
-                      job description)
-                    </label>
-                    <textarea
-                      id="contextPrompt"
-                      className="form-control"
-                      value={contextPrompt}
-                      onChange={(e) => {
-                        setContextPrompt(e.target.value);
-                        if (errorMessage) setErrorMessage(null);
-                      }}
-                      placeholder="I am Math teacher"
-                    />
+                  <label htmlFor="contextPrompt" className={styles.contextLabel}>
+                    Interview context
+                  </label>
+                  <p className={styles.contextDescription}>
+                    Describe the role, interviewer profile, or job description. The more
+                    detail, the sharper the questions.
+                  </p>
+                  <textarea
+                    id="contextPrompt"
+                    className={styles.contextTextarea}
+                    value={contextPrompt}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      setContextPrompt(nextValue);
+                      if (contextPromptError) {
+                        setContextPromptError(validateContextPrompt(nextValue));
+                      }
+                      if (errorMessage) setErrorMessage(null);
+                    }}
+                    onBlur={() => {
+                      setContextPromptError(validateContextPrompt(contextPrompt));
+                    }}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                        e.preventDefault();
+                        e.currentTarget.form?.requestSubmit();
+                      }
+                    }}
+                    placeholder="e.g. I'm interviewing for a Middle School Math Teacher role at a private STEM-focused academy..."
+                    required
+                    rows={5}
+                    aria-invalid={Boolean(contextPromptError)}
+                    aria-describedby={contextPromptError ? "contextPromptError" : undefined}
+                  />
+                  {contextPromptError ? (
+                    <div id="contextPromptError" className={styles.error}>
+                      {contextPromptError}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className={styles.quickStartSection}>
+                  <div className={styles.quickStartLabel}>Quick start</div>
+                  <div className={styles.quickStartChips}>
+                    {[
+                      "Math Teacher - Middle School",
+                      "Curriculum Designer",
+                      "School Principal",
+                      "EdTech Product Manager",
+                    ].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={styles.quickStartChip}
+                        onClick={() => {
+                          setContextPrompt(
+                            `I'm interviewing for a ${preset} role. Ask realistic questions and adapt follow-ups based on my answers.`
+                          );
+                          if (contextPromptError) setContextPromptError(null);
+                          if (errorMessage) setErrorMessage(null);
+                        }}
+                      >
+                        {preset}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className={styles.submitRow}>
+                <div className={styles.configureFooter}>
+                  <div className={styles.footerHint}>
+                    Ctrl + Enter to start | Sessions auto-save
+                  </div>
                   <button
                     type="submit"
                     className="btn-primary"
+                    disabled={resumeStatus !== "present"}
                   >
-                    Submit
+                    Start AI Interview
                   </button>
                 </div>
+
+                {errorMessage ? (
+                  <div className={styles.pageAlert}>
+                    <div className={styles.pageAlertTitle}>Interview notice</div>
+                    <div className={styles.pageAlertBody}>{errorMessage}</div>
+                  </div>
+                ) : null}
               </form>
-            ) : null}
+
+              <div className={styles.configureSide}>
+                <aside className={styles.expectationCard}>
+                  <h3>What to expect</h3>
+                  <p>A focused, text-based session tailored to your role.</p>
+                  <ul className={styles.expectationList}>
+                    <li>
+                      <span aria-hidden="true" className="unicode-icon">✨</span>
+                      <div>
+                        <strong>Structured questions</strong>
+                        <p>Behavioral and role-specific prompts with instant AI feedback.</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span aria-hidden="true" className="unicode-icon">🎯</span>
+                      <div>
+                        <strong>Guided follow-ups</strong>
+                        <p>Adaptive probes that mirror a real interviewer&apos;s flow.</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span aria-hidden="true" className="unicode-icon">⚡</span>
+                      <div>
+                        <strong>STAR-style coaching</strong>
+                        <p>Clear strengths, gaps, and rewrites after every answer.</p>
+                      </div>
+                    </li>
+                  </ul>
+                </aside>
+
+                <div className={styles.tipCard}>
+                  <strong>💡 Pro tip:</strong> mention the grade level, subject focus, and
+                  interviewer&apos;s role for sharper, more realistic questions.
+                </div>
+              </div>
+            </div>
           </>
         ) : (
           <>

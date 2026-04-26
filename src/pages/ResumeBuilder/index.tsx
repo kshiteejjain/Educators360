@@ -1328,10 +1328,10 @@ export default function ResumeBuilder() {
                       e.stopPropagation();
                     }}
                   >
-                    Delete
+                    ❌
                   </button>
                   <span className={styles.photoCamera} aria-hidden="true">
-                    Camera
+                    📸
                   </span>
                   <input
                     ref={photoInputRef}
