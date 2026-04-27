@@ -327,7 +327,7 @@
 }
 
 .statCard {
-  background: linear-gradient(135deg, var(--color-f8f9fa) 0%, var(--color-e9ecef) 100%);
+  background: linear-gradient(135deg, var(--color-blue-gray) 0%, var(--color-e9ecef) 100%);
   border-radius: 16px;
   padding: 1.25rem 0.75rem;
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
@@ -339,7 +339,7 @@
   transform: translateY(-5px) scale(1.05);
   box-shadow: 0 12px 24px var(--color-rgba-0-0-0-012);
   border-color: var(--color-667eea);
-  background: linear-gradient(135deg, var(--color-white) 0%, var(--color-f8f9fa) 100%);
+  background: linear-gradient(135deg, var(--color-white) 0%, var(--color-blue-gray) 100%);
 }
 
 .statIcon {

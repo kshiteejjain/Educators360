@@ -8,12 +8,12 @@ import styles from "./Sidebar.module.css";
 
 const menuItems = [
   { name: "Dashboard", path: "/Dashboard", icon: "\u{1F4CA}" },
-  { name: "Job Search", path: "/ViewJobs", icon: "\u{1F5C2}\u{FE0F}" },
   { name: "Resume Builder", path: "/ResumeBuilder", icon: "\u{1F4C4}" },
   { name: "LinkedIn Profile Analysis", path: "/LinkedinAnalysis", icon: "\u{1F50D}" },
   { name: "Schedule 1:1 Meet", path: "/Mentorship", icon: "\u{1F4C5}" },
   { name: "Assessment", path: "/Assessment", icon: "\u{1F4DD}" },
   { name: "AI Interview", path: "/AIInterview", icon: "\u{1F916}" },
+  { name: "Job Search", path: "/ViewJobs", icon: "\u{1F5C2}\u{FE0F}" },
   { name: "Ask Anu - Your AI Coach", path: "/AskAnu", icon: "/shiksha.png" },
   { name: "Discussions", path: "/Discussions", icon: "\u{1F4AC}" },
   { name: "Bulk Upload", path: "/Upload", icon: "\u{1F4E4}" }

@@ -153,8 +153,8 @@ export default function AIInterview() {
         parsed?.resume && typeof parsed.resume === "object" ? parsed.resume : null;
       const data =
         resume &&
-        typeof (resume as Record<string, unknown>).data === "object" &&
-        (resume as Record<string, unknown>).data !== null
+          typeof (resume as Record<string, unknown>).data === "object" &&
+          (resume as Record<string, unknown>).data !== null
           ? ((resume as Record<string, unknown>).data as Record<string, unknown>)
           : null;
       if (!data) {
@@ -460,9 +460,22 @@ export default function AIInterview() {
       throw new Error("Adaptive question was empty.");
     }
 
-    const fallbackId = `q-${(historyOverride ?? buildQuestionHistory()).length + 1}`;
+    const history = historyOverride ?? buildQuestionHistory();
+    const existingIds = new Set(history.map((item) => item.id));
+    const fallbackId = `q-${history.length + 1}`;
+    let resolvedId = data.question.id?.trim() || fallbackId;
+    if (existingIds.has(resolvedId)) {
+      let sequence = history.length + 1;
+      let nextId = `q-${sequence}`;
+      while (existingIds.has(nextId)) {
+        sequence += 1;
+        nextId = `q-${sequence}`;
+      }
+      resolvedId = nextId;
+    }
+
     return {
-      id: data.question.id?.trim() || fallbackId,
+      id: resolvedId,
       prompt: data.question.prompt.trim(),
       category: data.question.category?.trim() || "Adaptive",
     } satisfies InterviewQuestion;
@@ -728,13 +741,11 @@ export default function AIInterview() {
         {view === "configure" ? (
           <>
             <div className={styles.headerRow}>
-              <div>
-                <h2 className={styles.title}>AI Interview</h2>
-                <p className={styles.subtitle}>
-                  Practice realistic Q&A sessions with an AI coach. Get instant feedback on
-                  structure, clarity, and confidence before the real thing.
-                </p>
-              </div>
+              <h2 className={styles.title}>AI Interview</h2>
+              <p className={styles.subtitle}>
+                Practice realistic Q&A sessions with an AI coach. Get instant feedback on
+                structure, clarity, and confidence before the real thing.
+              </p>
             </div>
             {resumeStatus === "missing" ? (
               <div className={styles.pageAlert}>
@@ -747,42 +758,39 @@ export default function AIInterview() {
             ) : null}
 
             <div className={styles.configureGrid}>
-              <form className={styles.configureCard} onSubmit={handleSubmit}>
+              <div className={styles.configureCard}>
+                <form onSubmit={handleSubmit}>
                 <div>
                   <label htmlFor="contextPrompt" className={styles.contextLabel}>
-                    Interview context
+                    Add Job Description
                   </label>
-                  <p className={styles.contextDescription}>
-                    Describe the role, interviewer profile, or job description. The more
-                    detail, the sharper the questions.
-                  </p>
                   <textarea
-                    id="contextPrompt"
-                    className={styles.contextTextarea}
-                    value={contextPrompt}
-                    onChange={(e) => {
-                      const nextValue = e.target.value;
-                      setContextPrompt(nextValue);
-                      if (contextPromptError) {
-                        setContextPromptError(validateContextPrompt(nextValue));
-                      }
-                      if (errorMessage) setErrorMessage(null);
-                    }}
-                    onBlur={() => {
-                      setContextPromptError(validateContextPrompt(contextPrompt));
-                    }}
-                    onKeyDown={(e) => {
-                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                        e.preventDefault();
-                        e.currentTarget.form?.requestSubmit();
-                      }
-                    }}
-                    placeholder="e.g. I'm interviewing for a Middle School Math Teacher role at a private STEM-focused academy..."
-                    required
-                    rows={5}
-                    aria-invalid={Boolean(contextPromptError)}
-                    aria-describedby={contextPromptError ? "contextPromptError" : undefined}
-                  />
+                      id="contextPrompt"
+                      className={styles.contextTextarea}
+                      value={contextPrompt}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setContextPrompt(nextValue);
+                        if (contextPromptError) {
+                          setContextPromptError(validateContextPrompt(nextValue));
+                        }
+                        if (errorMessage) setErrorMessage(null);
+                      }}
+                      onBlur={() => {
+                        setContextPromptError(validateContextPrompt(contextPrompt));
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                          e.preventDefault();
+                          e.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                      placeholder="e.g. I want to become a middle school math teacher. The interviewer is the school principal. Focus on behavioral and role-specific questions."
+                      required
+                      rows={5}
+                      aria-invalid={Boolean(contextPromptError)}
+                      aria-describedby={contextPromptError ? "contextPromptError" : undefined}
+                    />
                   {contextPromptError ? (
                     <div id="contextPromptError" className={styles.error}>
                       {contextPromptError}
@@ -790,54 +798,35 @@ export default function AIInterview() {
                   ) : null}
                 </div>
 
-                <div className={styles.quickStartSection}>
-                  <div className={styles.quickStartLabel}>Quick start</div>
-                  <div className={styles.quickStartChips}>
-                    {[
-                      "Math Teacher - Middle School",
-                      "Curriculum Designer",
-                      "School Principal",
-                      "EdTech Product Manager",
-                    ].map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        className={styles.quickStartChip}
-                        onClick={() => {
-                          setContextPrompt(
-                            `I'm interviewing for a ${preset} role. Ask realistic questions and adapt follow-ups based on my answers.`
-                          );
-                          if (contextPromptError) setContextPromptError(null);
-                          if (errorMessage) setErrorMessage(null);
-                        }}
-                      >
-                        {preset}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className={styles.configureFooter}>
-                  <div className={styles.footerHint}>
-                    Ctrl + Enter to start | Sessions auto-save
+                    <div className={styles.footerHint}>
+                      Ctrl + Enter to start | Sessions auto-save
+                    </div>
+                    <button
+                      type="submit"
+                      className="btn-primary"
+                      disabled={resumeStatus !== "present"}
+                    >
+                      Start AI Interview
+                    </button>
                   </div>
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    disabled={resumeStatus !== "present"}
-                  >
-                    Start AI Interview
-                  </button>
+
+                  {errorMessage ? (
+                    <div className={styles.pageAlert}>
+                      <div className={styles.pageAlertTitle}>Interview notice</div>
+                      <div className={styles.pageAlertBody}>{errorMessage}</div>
+                    </div>
+                  ) : null}
+                </form>
+                <div className={styles.tipCard}>
+                  <strong>Note:</strong> This interview uses your job description and resume
+                  to generate personalized interview questions. If you do not have a resume
+                  yet, please create one in the{" "}
+                  <Link href="/ResumeBuilder" className={styles.tipCardLink}>
+                    Resume Builder
+                  </Link>.
                 </div>
-
-                {errorMessage ? (
-                  <div className={styles.pageAlert}>
-                    <div className={styles.pageAlertTitle}>Interview notice</div>
-                    <div className={styles.pageAlertBody}>{errorMessage}</div>
-                  </div>
-                ) : null}
-              </form>
-
+              </div>
               <div className={styles.configureSide}>
                 <aside className={styles.expectationCard}>
                   <h3>What to expect</h3>
@@ -867,16 +856,12 @@ export default function AIInterview() {
                   </ul>
                 </aside>
 
-                <div className={styles.tipCard}>
-                  <strong>💡 Pro tip:</strong> mention the grade level, subject focus, and
-                  interviewer&apos;s role for sharper, more realistic questions.
-                </div>
               </div>
             </div>
           </>
         ) : (
           <>
-            <div className={styles.headerRow}>
+            <div className={styles.topHeaderRow}>
               <div className={styles.interactionHeader}>
                 <h2 className={styles.interactionTitle}>AI Interview</h2>
               </div>
@@ -888,298 +873,296 @@ export default function AIInterview() {
             <div className={styles.interviewLayout}>
               <main className={styles.questionPanel}>
                 {interviewReport ? (
-                    <div className={styles.reportPanel}>
-                      <div className={styles.reportHeader}>
+                  <div className={styles.reportPanel}>
+                    <div className={styles.reportHeader}>
+                      <div>
+                        <h3>Interview Report</h3>
+                        <p>Summary of performance and recommendations</p>
+                      </div>
+                      <div className={styles.reportBadge}>Completed</div>
+                    </div>
+
+                    <div className={styles.reportGrid}>
+                      <div className={styles.reportCard}>
+                        <div className={styles.reportIcon}>🏆</div>
                         <div>
-                          <h3>Interview Report</h3>
-                          <p>Summary of performance and recommendations</p>
-                        </div>
-                        <div className={styles.reportBadge}>Completed</div>
-                      </div>
-
-                      <div className={styles.reportGrid}>
-                        <div className={styles.reportCard}>
-                          <div className={styles.reportIcon}>🏆</div>
-                          <div>
-                            <div className={styles.reportValue}>{interviewReport.score}</div>
-                            <div className={styles.reportLabel}>Score</div>
-                          </div>
-                        </div>
-                        <div className={styles.reportCard}>
-                          <div className={styles.reportIcon}>🧭</div>
-                          <div>
-                            <div className={styles.reportValue}>
-                              {interviewReport.confidence}
-                            </div>
-                            <div className={styles.reportLabel}>Confidence</div>
-                          </div>
-                        </div>
-                        <div className={styles.reportCard}>
-                          <div className={styles.reportIcon}>⏱️</div>
-                          <div>
-                            <div className={styles.reportValue}>
-                              {interviewReport.timeTakenSeconds ?? "N/A"}s
-                            </div>
-                            <div className={styles.reportLabel}>Time Taken</div>
-                          </div>
-                        </div>
-                        <div className={styles.reportCard}>
-                          <div className={styles.reportIcon}>✅</div>
-                          <div>
-                            <div className={styles.reportValue}>
-                              {interviewReport.answeredQuestions}/{interviewReport.totalQuestions}
-                            </div>
-                            <div className={styles.reportLabel}>Answered</div>
-                          </div>
+                          <div className={styles.reportValue}>{interviewReport.score}</div>
+                          <div className={styles.reportLabel}>Score</div>
                         </div>
                       </div>
-
-                      <div className={styles.reportCharts}>
-                        <div className={styles.chartCard}>
-                          <div className={styles.chartTitle}>Score (out of 10)</div>
-                          <canvas
-                            ref={scoreCanvasRef}
-                            className={styles.scoreChartCanvas}
-                            width={180}
-                            height={180}
-                          />
-                        </div>
-                        <div className={styles.chartCard}>
-                          <div className={styles.chartTitle}>Completion</div>
-                          <canvas
-                            ref={completionCanvasRef}
-                            className={styles.scoreChartCanvas}
-                            width={180}
-                            height={180}
-                          />
+                      <div className={styles.reportCard}>
+                        <div className={styles.reportIcon}>🧭</div>
+                        <div>
+                          <div className={styles.reportValue}>
+                            {interviewReport.confidence}
+                          </div>
+                          <div className={styles.reportLabel}>Confidence</div>
                         </div>
                       </div>
+                      <div className={styles.reportCard}>
+                        <div className={styles.reportIcon}>⏱️</div>
+                        <div>
+                          <div className={styles.reportValue}>
+                            {interviewReport.timeTakenSeconds ?? "N/A"}s
+                          </div>
+                          <div className={styles.reportLabel}>Time Taken</div>
+                        </div>
+                      </div>
+                      <div className={styles.reportCard}>
+                        <div className={styles.reportIcon}>✅</div>
+                        <div>
+                          <div className={styles.reportValue}>
+                            {interviewReport.answeredQuestions}/{interviewReport.totalQuestions}
+                          </div>
+                          <div className={styles.reportLabel}>Answered</div>
+                        </div>
+                      </div>
+                    </div>
 
+                    <div className={styles.reportCharts}>
+                      <div className={styles.chartCard}>
+                        <div className={styles.chartTitle}>Score (out of 10)</div>
+                        <canvas
+                          ref={scoreCanvasRef}
+                          className={styles.scoreChartCanvas}
+                          width={180}
+                          height={180}
+                        />
+                      </div>
+                      <div className={styles.chartCard}>
+                        <div className={styles.chartTitle}>Completion</div>
+                        <canvas
+                          ref={completionCanvasRef}
+                          className={styles.scoreChartCanvas}
+                          width={180}
+                          height={180}
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.reportSection}>
+                      <div className={styles.sectionTitle}>📝 Summary</div>
+                      <p className={styles.sectionBody}>{interviewReport.summary}</p>
+                    </div>
+
+                    {interviewReport.overallFeedback ? (
                       <div className={styles.reportSection}>
-                        <div className={styles.sectionTitle}>📝 Summary</div>
-                        <p className={styles.sectionBody}>{interviewReport.summary}</p>
+                        <div className={styles.sectionTitle}>🧠 Overall Feedback</div>
+                        <p className={styles.sectionBody}>
+                          {interviewReport.overallFeedback}
+                        </p>
                       </div>
+                    ) : null}
 
-                      {interviewReport.overallFeedback ? (
+                    <div className={styles.reportColumns}>
+                      <div className={styles.reportSection}>
+                        <div className={styles.sectionTitle}>💪 Strengths</div>
+                        <ul className={styles.sectionList}>
+                          {interviewReport.strengths.map((item, idx) => (
+                            <li key={`strength-${idx}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className={styles.reportSection}>
+                        <div className={styles.sectionTitle}>🧩 Gaps</div>
+                        <ul className={styles.sectionList}>
+                          {interviewReport.gaps.map((item, idx) => (
+                            <li key={`gap-${idx}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className={styles.reportSection}>
+                        <div className={styles.sectionTitle}>🚀 Recommendations</div>
+                        <ul className={styles.sectionList}>
+                          {interviewReport.recommendations.map((item, idx) => (
+                            <li key={`rec-${idx}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      {interviewReport.suggestions?.length ? (
                         <div className={styles.reportSection}>
-                          <div className={styles.sectionTitle}>🧠 Overall Feedback</div>
-                          <p className={styles.sectionBody}>
-                            {interviewReport.overallFeedback}
-                          </p>
+                          <div className={styles.sectionTitle}>💡 Suggestions</div>
+                          <ul className={styles.sectionList}>
+                            {interviewReport.suggestions.map((item, idx) => (
+                              <li key={`suggestion-${idx}`}>{item}</li>
+                            ))}
+                          </ul>
                         </div>
                       ) : null}
-
-                      <div className={styles.reportColumns}>
+                      {interviewReport.feedback?.length ? (
                         <div className={styles.reportSection}>
-                          <div className={styles.sectionTitle}>💪 Strengths</div>
+                          <div className={styles.sectionTitle}>🧾 Feedback</div>
                           <ul className={styles.sectionList}>
-                            {interviewReport.strengths.map((item, idx) => (
-                              <li key={`strength-${idx}`}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div className={styles.reportSection}>
-                          <div className={styles.sectionTitle}>🧩 Gaps</div>
-                          <ul className={styles.sectionList}>
-                            {interviewReport.gaps.map((item, idx) => (
-                              <li key={`gap-${idx}`}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div className={styles.reportSection}>
-                          <div className={styles.sectionTitle}>🚀 Recommendations</div>
-                          <ul className={styles.sectionList}>
-                            {interviewReport.recommendations.map((item, idx) => (
-                              <li key={`rec-${idx}`}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                        {interviewReport.suggestions?.length ? (
-                          <div className={styles.reportSection}>
-                            <div className={styles.sectionTitle}>💡 Suggestions</div>
-                            <ul className={styles.sectionList}>
-                              {interviewReport.suggestions.map((item, idx) => (
-                                <li key={`suggestion-${idx}`}>{item}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
-                        {interviewReport.feedback?.length ? (
-                          <div className={styles.reportSection}>
-                            <div className={styles.sectionTitle}>🧾 Feedback</div>
-                            <ul className={styles.sectionList}>
-                              {interviewReport.feedback.map((item, idx) => (
-                                <li key={`feedback-${idx}`}>{item}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {interviewReport.questionFeedback?.length ? (
-                        <div className={styles.reportSection}>
-                          <div className={styles.sectionTitle}>📌 Question-wise Feedback</div>
-                          <ul className={styles.sectionList}>
-                            {interviewReport.questionFeedback.map((item, idx) => (
-                              <li key={`question-feedback-${item.questionId || idx}`}>
-                                <strong>{item.question || `Question ${idx + 1}`}</strong>
-                                <br />
-                                {item.feedback}
-                              </li>
+                            {interviewReport.feedback.map((item, idx) => (
+                              <li key={`feedback-${idx}`}>{item}</li>
                             ))}
                           </ul>
                         </div>
                       ) : null}
                     </div>
+
+                    {interviewReport.questionFeedback?.length ? (
+                      <div className={styles.reportSection}>
+                        <div className={styles.sectionTitle}>📌 Question-wise Feedback</div>
+                        <ul className={styles.sectionList}>
+                          {interviewReport.questionFeedback.map((item, idx) => (
+                            <li key={`question-feedback-${item.questionId || idx}`}>
+                              <strong>{item.question || `Question ${idx + 1}`}</strong>
+                              <br />
+                              {item.feedback}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <>
-                      <div className={styles.questionHeader}>
-                        <div>
-                          <h3>Interview Questions</h3>
-                          <p>Answer one question at a time using text or voice</p>
-                        </div>
-                        <div className={styles.questionMeta}>
-                          {questionLoading
-                            ? "Generating..."
-                            : questions.length
-                              ? `${currentIndex + 1}/${MAX_QUESTIONS}`
-                              : `0/${MAX_QUESTIONS}`}
-                        </div>
+                    <div className={styles.questionHeader}>
+                      <div>
+                        <h3>Interview Questions</h3>
+                        <p>Answer one question at a time using text or voice</p>
                       </div>
+                      <div className={styles.questionMeta}>
+                        {questionLoading
+                          ? "Generating..."
+                          : questions.length
+                            ? `${currentIndex + 1}/${MAX_QUESTIONS}`
+                            : `0/${MAX_QUESTIONS}`}
+                      </div>
+                    </div>
 
-                      {speechError ? (
-                        <div className={styles.speechError}>{speechError}</div>
-                      ) : null}
+                    {speechError ? (
+                      <div className={styles.speechError}>{speechError}</div>
+                    ) : null}
 
-                      {questions.length ? (
-                        <div className={styles.questionCard}>
-                          <div className={styles.questionTopRow}>
-                            <div className={styles.questionTitle}>
-                              {currentQuestion
-                                ? `Question ${currentIndex + 1}/${MAX_QUESTIONS}`
-                                : "Question"}
-                            </div>
-                            {readAloudSupported ? (
-                              <button
-                                type="button"
-                                className={styles.readAloudButton}
-                                onClick={() => {
-                                  if (!currentQuestion) return;
-                                  if (isSpeaking) {
-                                    stopSpeaking();
-                                    return;
-                                  }
-                                  speakQuestion(currentQuestion.prompt);
-                                }}
-                                disabled={!currentQuestion}
-                              >
-                                {isSpeaking ? "Stop Audio" : "Read Aloud"}
-                              </button>
-                            ) : null}
-                          </div>
-                          <div className={styles.questionText}>
-                            {currentQuestion?.prompt}
+                    {questions.length ? (
+                      <div className={styles.questionCard}>
+                        <div className={styles.questionTopRow}>
+                          <div className={styles.questionTitle}>
+                            {currentQuestion
+                              ? `Question ${currentIndex + 1}/${MAX_QUESTIONS}`
+                              : "Question"}
                           </div>
                           {readAloudSupported ? (
-                            <label className={styles.autoReadToggle}>
-                              <input
-                                type="checkbox"
-                                checked={autoReadAloud}
-                                onChange={(event) => setAutoReadAloud(event.target.checked)}
-                              />
-                              Auto read new questions
-                            </label>
-                          ) : null}
-                          <div className={styles.answerBlock}>
-                            <div className={styles.answerInputWrapper}>
-                              <textarea
-                                className={`${styles.answerTextarea} ${
-                                  isRecording ? styles.answerTextareaRecording : ""
-                                }`}
-                                value={answers[currentQuestion?.id] ?? ""}
-                                onChange={(e) =>
-                                  updateAnswerText(currentQuestion.id, e.target.value)
+                            <button
+                              type="button"
+                              className={styles.readAloudButton}
+                              onClick={() => {
+                                if (!currentQuestion) return;
+                                if (isSpeaking) {
+                                  stopSpeaking();
+                                  return;
                                 }
-                                placeholder="Type your answer here..."
-                                rows={6}
-                                disabled={Boolean(interviewCompletedAt)}
-                              />
-                              {speechSupported && (
-                                <button
-                                  type="button"
-                                  className={`${styles.recordButton} ${
-                                    isRecording ? styles.recordButtonActive : ""
+                                speakQuestion(currentQuestion.prompt);
+                              }}
+                              disabled={!currentQuestion}
+                            >
+                              {isSpeaking ? "Stop Audio" : "Read Aloud"}
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className={styles.questionText}>
+                          {currentQuestion?.prompt}
+                        </div>
+                        {readAloudSupported ? (
+                          <label className={styles.autoReadToggle}>
+                            <input
+                              type="checkbox"
+                              checked={autoReadAloud}
+                              onChange={(event) => setAutoReadAloud(event.target.checked)}
+                            />
+                            Auto read new questions
+                          </label>
+                        ) : null}
+                        <div className={styles.answerBlock}>
+                          <div className={styles.answerInputWrapper}>
+                            <textarea
+                              className={`${styles.answerTextarea} ${isRecording ? styles.answerTextareaRecording : ""
+                                }`}
+                              value={answers[currentQuestion?.id] ?? ""}
+                              onChange={(e) =>
+                                updateAnswerText(currentQuestion.id, e.target.value)
+                              }
+                              placeholder="Type your answer here..."
+                              rows={6}
+                              disabled={Boolean(interviewCompletedAt)}
+                            />
+                            {speechSupported && (
+                              <button
+                                type="button"
+                                className={`${styles.recordButton} ${isRecording ? styles.recordButtonActive : ""
                                   }`}
-                                  onClick={() => toggleRecordingForQuestion(currentQuestion.id)}
-                                  aria-label="Start recording"
-                                  disabled={Boolean(interviewCompletedAt) || isRecording || isSpeaking}
-                                >
-                                  <img src="/mic.svg" alt="Mic" width={18} height={18} />
-                                </button>
-                              )}
-                            </div>
-                            {isRecording && (
-                              <div className={styles.speechHint}>
-                                Recording... will stop after 5 seconds of silence.
-                              </div>
+                                onClick={() => toggleRecordingForQuestion(currentQuestion.id)}
+                                aria-label="Start recording"
+                                disabled={Boolean(interviewCompletedAt) || isRecording || isSpeaking}
+                              >
+                                <img src="/mic.svg" alt="Mic" width={18} height={18} />
+                              </button>
                             )}
                           </div>
+                          {isRecording && (
+                            <div className={styles.speechHint}>
+                              Recording... will stop after 5 seconds of silence.
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div className={styles.emptyState}>
-                          Questions will appear here once the interview starts.
-                        </div>
-                      )}
+                      </div>
+                    ) : (
+                      <div className={styles.emptyState}>
+                        Questions will appear here once the interview starts.
+                      </div>
+                    )}
 
-                      {errorMessage ? (
-                        <div className={styles.pageAlert}>
-                          <div className={styles.pageAlertTitle}>Interview notice</div>
-                          <div className={styles.pageAlertBody}>{errorMessage}</div>
-                        </div>
-                      ) : null}
+                    {errorMessage ? (
+                      <div className={styles.pageAlert}>
+                        <div className={styles.pageAlertTitle}>Interview notice</div>
+                        <div className={styles.pageAlertBody}>{errorMessage}</div>
+                      </div>
+                    ) : null}
 
-                      {questions.length ? (
-                        <div className={styles.questionActions}>
-                          {!interviewCompletedAt ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn-primary"
-                                onClick={goToPrevious}
-                                disabled={currentIndex === 0}
-                              >
-                                Previous Question
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-primary"
-                                onClick={() => {
-                                  void goToNext();
-                                }}
-                                disabled={
-                                  questionLoading ||
-                                  !questions[currentIndex] ||
-                                  !answers[questions[currentIndex].id]?.trim() ||
-                                  (currentIndex === questions.length - 1 &&
-                                    questions.length >= MAX_QUESTIONS)
-                                }
-                              >
-                                {questionLoading ? "Generating..." : "Next Question"}
-                              </button>
-                            </>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            onClick={submitInterview}
-                            disabled={
-                              reportLoading || !hasAnswers()
-                            }
-                          >
-                            {reportLoading ? "Generating Report..." : "Submit Interview"}
-                          </button>
-                        </div>
-                      ) : null}
+                    {questions.length ? (
+                      <div className={styles.questionActions}>
+                        {!interviewCompletedAt ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={goToPrevious}
+                              disabled={currentIndex === 0}
+                            >
+                              Previous Question
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={() => {
+                                void goToNext();
+                              }}
+                              disabled={
+                                questionLoading ||
+                                !questions[currentIndex] ||
+                                !answers[questions[currentIndex].id]?.trim() ||
+                                (currentIndex === questions.length - 1 &&
+                                  questions.length >= MAX_QUESTIONS)
+                              }
+                            >
+                              {questionLoading ? "Generating..." : "Next Question"}
+                            </button>
+                          </>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={submitInterview}
+                          disabled={
+                            reportLoading || !hasAnswers()
+                          }
+                        >
+                          {reportLoading ? "Generating Report..." : "Submit Interview"}
+                        </button>
+                      </div>
+                    ) : null}
                   </>
                 )}
               </main>
@@ -1190,4 +1173,5 @@ export default function AIInterview() {
     </Layout>
   );
 }
+
 
